@@ -2,22 +2,23 @@ local util = require("util")
 local crash_site = require("crash-site")
 local spitter_death_records = 20
 
+
 ----We disable victory conditions of silo script because it doesn't work with soft reset
-global.no_victory = true
+_ENV.no_victory = true
 ---
-global.biter_hp = 3000
+_ENV.biter_hp = 3000
 
-global.biter_initial_hp = 3000
-global.biter_target_hp_multiplier = 300
-global.biter_target_hp = global.biter_target_hp_multiplier * global.biter_initial_hp
-global.biter_hp_base_modifier = 0.002
+_ENV.biter_initial_hp = 3000
+_ENV.biter_target_hp_multiplier = 300
+_ENV.biter_target_hp = _ENV.biter_target_hp_multiplier * _ENV.biter_initial_hp
+_ENV.biter_hp_base_modifier = 0.002
 
-global.extremely_hard_victory = false
-global.reset_seed = 987654321
-global.reset_seed_delayed = 987654321
-global.restart = "false"
-global.hard_mode = false
-global.spitter_to_worm_conversion_map =
+_ENV.extremely_hard_victory = false
+_ENV.reset_seed = 987654321
+_ENV.reset_seed_delayed = 987654321
+_ENV.restart = "false"
+_ENV.hard_mode = false
+_ENV.spitter_to_worm_conversion_map =
 {
 	["small-spitter"] = "small-worm-turret",
 	["medium-spitter"] = "medium-worm-turret",
@@ -28,26 +29,26 @@ global.spitter_to_worm_conversion_map =
 
 
 local resetVariables = function()
-	global.player_state = {}
-	global.deconstruction_history = {}
-	global.new_map = true
+	_ENV.player_state = {}
+	_ENV.deconstruction_history = {}
+	_ENV.new_map = true
 	-- clear globals
-	global.extremely_hard_victory = false
-	global.latch = 0
-	global.u = {}
+	_ENV.extremely_hard_victory = false
+	_ENV.latch = 0
+	_ENV.u = {}
 	for i = 1, spitter_death_records do
-		global.u[i] = { 0, 0 }
+		_ENV.u[i] = { 0, 0 }
 	end
-	global.biter_hp = 3000
-	global.kills_min = 250
-	global.kills_max = 300
-	global.deconstruction_history = {}
-	global.no_regen_biters = {}
+	_ENV.biter_hp = 3000
+	_ENV.kills_min = 250
+	_ENV.kills_max = 300
+	_ENV.deconstruction_history = {}
+	_ENV.no_regen_biters = {}
 
 	-- default starting map settings
 	game.map_settings.enemy_evolution.destroy_factor = 0
 	game.map_settings.enemy_evolution.pollution_factor = 0
-	if global.hard_mode then
+	if _ENV.hard_mode then
 		game.map_settings.enemy_evolution.time_factor = 0.00007
 		game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = 0.5
 	else
@@ -125,7 +126,7 @@ end
 local change_seed = function()
 	local surface = game.surfaces[1]
 	local mgs = surface.map_gen_settings
-	mgs.seed = global.reset_seed
+	mgs.seed = _ENV.reset_seed
 	surface.map_gen_settings = mgs
 end
 -------------------------------------------------------------------------------------------------------------------------------
@@ -144,7 +145,7 @@ local reset_global_setings__pre_surface_clear = function()
 	-- convert water tiles immediately. We need to disable this flag before
 	-- reset, so that reset chunks are not touch until the surface clear is
 	-- fully complete.
-	global.new_map = true
+	_ENV.new_map = true
 
 	-- We reset time played before clearing the surface. That way,
 	-- the periodic check that converts all water tiles does not fire until
@@ -157,7 +158,7 @@ local reset_global_settings__post_surface_clear = function()
 	game.reset_game_state()
 	game.forces["enemy"].reset()
 	game.forces["enemy"].reset_evolution()
-	game.pollution_statistics.clear()
+	game.get_pollution_statistics(0).clear()
 	resetVariables()
 
 
@@ -203,21 +204,21 @@ local reset_global_settings = function()
 end
 
 local handle_player_created_or_respawned = function(player_index)
-	if(global.player_state == nil) then
+	if(_ENV.player_state == nil) then
 		resetVariables()
 	end
 	local player = game.get_player(player_index)
 
-	if global.player_state[player_index] == nil then
-		global.player_state[player_index] = default_player_state()
+	if _ENV.player_state[player_index] == nil then
+		_ENV.player_state[player_index] = default_player_state()
 	end
-	local player_state = global.player_state[player_index]
+	local player_state = _ENV.player_state[player_index]
 
 	if player_state.has_received_starting_items == false then
 		player_state.has_received_starting_items = true
-		util.insert_safe(player, global.created_items)
+		util.insert_safe(player, _ENV.created_items)
 	else
-		util.insert_safe(player, global.respawn_items)
+		util.insert_safe(player, _ENV.respawn_items)
 	end
 end
 
@@ -229,21 +230,21 @@ local on_player_created = function(event)
 
 	handle_player_created_or_respawned(event.player_index)
 
-	if not global.init_ran then
+	if not _ENV.init_ran then
 		-- This is so that other mods and scripts have a chance to do remote calls before we do things like charting the starting area, creating the crash site, etc.
-		global.init_ran = true
+		_ENV.init_ran = true
 
 		reset_global_settings()
 
-		if not global.disable_crashsite then
+		if not _ENV.disable_crashsite then
 			local surface = player.surface
-			crash_site.create_crash_site(surface, { -5, -6 }, util.copy(global.crashed_ship_items),
-				util.copy(global.crashed_debris_items), util.copy(global.crashed_ship_parts))
+			crash_site.create_crash_site(surface, { -5, -6 }, util.copy(_ENV.crashed_ship_items),
+				util.copy(_ENV.crashed_debris_items), util.copy(_ENV.crashed_ship_parts))
 		end
 	end
 
-	if not global.skip_intro then
-		player.print(global.custom_intro_message or { "msg-intro" })
+	if not _ENV.skip_intro then
+		player.print(_ENV.custom_intro_message or { "msg-intro" })
 	end
 end
 
@@ -254,18 +255,18 @@ end
 function reset(reason)
 	local reset_type = nil
 	local red = game.forces["player"].item_production_statistics.get_output_count "automation-science-pack"
-	if (global.restart == "true") then
+	if (_ENV.restart == "true") then
 		reset_type = "[color=red][font=default-large-bold]Hard reset[/font][/color]"
 		game.write_file("reset/reset.log", "restart", false, 0)
 	else
 		if (red > 0) then
-			local victory = global.extremely_hard_victory
+			local victory = _ENV.extremely_hard_victory
 			local deaths = game.forces["player"].kill_count_statistics.get_output_count "character"
 			local minutes = math.floor((game.ticks_played / 3600) * 10) / 10
-			local mode = global.hard_mode and "hard" or "normal"
+			local mode = _ENV.hard_mode and "hard" or "normal"
 			local rockets_launched = game.forces["player"].rockets_launched
 
-			local log_message = string.format("%d_%s_%s_%d_%d_%d_%d", global.reset_seed_delayed, mode, tostring(victory),
+			local log_message = string.format("%d_%s_%s_%d_%d_%d_%d", _ENV.reset_seed_delayed, mode, tostring(victory),
 				red, deaths, minutes, rockets_launched)
 
 			game.write_file("reset/reset.log", log_message, false, 0)
@@ -277,7 +278,7 @@ function reset(reason)
 	end
 	if reason ~= nil then
 		game.print(string.format("%s [color=yellow]%s Hardmode is currently [/color][color=%s[/color]", reset_type,
-			reason, global.hard_mode and "red]on" or "green]off"))
+			reason, _ENV.hard_mode and "red]on" or "green]off"))
 	end
 end
 
@@ -308,12 +309,12 @@ local on_surface_cleared = function(event)
 	local surface = game.surfaces[1]
 	surface.request_to_generate_chunks({ 0, 0 }, 6)
 	surface.force_generate_chunk_requests()
-	crash_site.create_crash_site(surface, { -5, -6 }, util.copy(global.crashed_ship_items),
-		util.copy(global.crashed_debris_items), util.copy(global.crashed_ship_parts))
+	crash_site.create_crash_site(surface, { -5, -6 }, util.copy(_ENV.crashed_ship_items),
+		util.copy(_ENV.crashed_debris_items), util.copy(_ENV.crashed_ship_parts))
 end
 ------------------------------------------------------------------------------------------
 local on_player_toggled_map_editor = function(event)
-	global.restart = "true"
+	_ENV.restart = "true"
 
 	local player = game.get_player(event.player_index)
 	reset(string.format("%s has toggled the map editor.", player.name))
@@ -325,8 +326,8 @@ local on_console_command = function(event)
 	print(command)
 	print(parameters)
 
-	if (game.console_command_used and global.restart ~= "true") then
-		global.restart = "true"
+	if (game.console_command_used and _ENV.restart ~= "true") then
+		_ENV.restart = "true"
 		local name = nil
 		if event.player_index ~= nil then
 			name = game.get_player(event.player_index).name
@@ -352,19 +353,19 @@ local function send_group_to_spitter_death(group)
 	local x = group.position.x
 	local y = group.position.y
 
-	-- Loop through the global.u table to calculate distances
+	-- Loop through the _ENV.u table to calculate distances
 	local min_distance = 1000000000
 	local min_location = 0
 	for i = 1, spitter_death_records do
-		local dx = x - global.u[i][1]
-		local dy = y - global.u[i][2]
+		local dx = x - _ENV.u[i][1]
+		local dy = y - _ENV.u[i][2]
 		local distance = (dx * dx) + (dy * dy)
 		if distance < min_distance then
 			min_distance = distance
 			min_location = i
 		end
 	end
-	local destination = global.u[min_location]
+	local destination = _ENV.u[min_location]
 	-- If the destination is 0,0, send the group to spawn as normal
 	if destination[1] == 0 and destination[2] == 0 then
 		send_group_to_spawn(group)
@@ -407,12 +408,12 @@ local function send_group_to_spitter_death(group)
 		structure_type = defines.compound_command.return_last,
 		commands =
 		{
-			{ type = defines.command.go_to_location, destination = global.u[min_location], distraction = defines.distraction.none },
-			{ type = defines.command.build_base,     destination = global.u[min_location], distraction = defines.distraction.none, ignore_planner = true }
+			{ type = defines.command.go_to_location, destination = _ENV.u[min_location], distraction = defines.distraction.none },
+			{ type = defines.command.build_base,     destination = _ENV.u[min_location], distraction = defines.distraction.none, ignore_planner = true }
 		}
 	}
 	--reset the location to 0,0 (to avoid continously sending these groups to the same location)
-	global.u[min_location] = { 0, 0 }
+	_ENV.u[min_location] = { 0, 0 }
 	group.set_command(command)
 end
 --------------------------------------------------------------------------------------------
@@ -421,10 +422,10 @@ local on_unit_group_finished_gathering = function(event)
 	--	send_group_to_spawn(event.group)
 	--	return
 	--end
-	if global.latch == 0 then
-		global.latch = 1
+	if _ENV.latch == 0 then
+		_ENV.latch = 1
 	else
-		global.latch = 0
+		_ENV.latch = 0
 		if math.random(1, 3) ~= 2 and false then
 			send_group_to_spawn(event.group)
 		else
@@ -434,21 +435,21 @@ local on_unit_group_finished_gathering = function(event)
 end
 -------------------------------------------------------------------------------------------------------
 script.on_nth_tick(120, function()
-	if global.new_map then
+	if _ENV.new_map then
 		if game.ticks_played > 100 then
-			global.new_map = false
-			global.reset_seed_delayed = global.reset_seed
+			_ENV.new_map = false
+			_ENV.reset_seed_delayed = _ENV.reset_seed
 			game.forces["player"].chart(game.surfaces[1], { { x = -400, y = -400 }, { x = 400, y = 400 } })
 		end
 	end
 end)
 local increase_biter_hp = function()
-	local hp = global.biter_hp
-	local pcent = global.biter_hp_base_modifier
-	local s_hp = global.biter_initial_hp
-	local t_hp = global.biter_target_hp
+	local hp = _ENV.biter_hp
+	local pcent = _ENV.biter_hp_base_modifier
+	local s_hp = _ENV.biter_initial_hp
+	local t_hp = _ENV.biter_target_hp
 	-- Increase the biter hp by a percentage of the difference between the target hp and the current hp
-	global.biter_hp = hp*(1+(pcent-(pcent*((hp-s_hp)/(t_hp-s_hp)) )))
+	_ENV.biter_hp = hp*(1+(pcent-(pcent*((hp-s_hp)/(t_hp-s_hp)) )))
 end
 -------------------------------------------------------------------------------------------------------
 -- Do adjustments every minute instead of 5 minutes
@@ -482,15 +483,15 @@ script.on_nth_tick(3600, function()
 
 	------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 	--if hardmode is on increase the size of the settler groups after 10 minutes, otherwise after 30 minutes
-	if ((game.ticks_played > 36000 and global.hard_mode) or game.ticks_played > 108000) then
+	if ((game.ticks_played > 36000 and _ENV.hard_mode) or game.ticks_played > 108000) then
 		--Start adjusting the pollution consumption modifier after 10 minutes in hardmode and 30 minutes in normal mode
 		if pollution > 1 then
 			local current_modifier = game.map_settings.pollution.enemy_attack_pollution_consumption_modifier
-			if kills < global.kills_min then
+			if kills < _ENV.kills_min then
 				-- Decrease the pollution consumption modifier by 5% if the player has killed less than 250 biters in the last 10 minutes
 				game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = math.max(
 					current_modifier * 0.95, 0.01)
-			elseif kills > global.kills_max then
+			elseif kills > _ENV.kills_max then
 				game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = math.min(
 					game.map_settings.pollution.enemy_attack_pollution_consumption_modifier / 0.95, 1.5)
 			end
@@ -501,10 +502,10 @@ script.on_nth_tick(3600, function()
 		game.map_settings.enemy_expansion.settler_group_min_size = 20
 		game.map_settings.enemy_expansion.settler_group_max_size = 22
 	end
-	-- iterate through the global.no_regen_biters and remove any invalid entries
-	for unit_number, biter in pairs(global.no_regen_biters) do
+	-- iterate through the _ENV.no_regen_biters and remove any invalid entries
+	for unit_number, biter in pairs(_ENV.no_regen_biters) do
 		if not biter.entity.valid then
-			global.no_regen_biters[unit_number] = nil
+			_ENV.no_regen_biters[unit_number] = nil
 		end
 	end
 	---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -520,8 +521,8 @@ script.on_event(defines.events.on_entity_died,
 			local entity_position = event.entity.position
 			local rand = math.random(1, spitter_death_records)
 			create_entity { name = "grenade", target = entity_position, speed = 1, position = entity_position, force = "enemy" }
-			global.u[rand][1] = entity_position.x
-			global.u[rand][2] = entity_position.y
+			_ENV.u[rand][1] = entity_position.x
+			_ENV.u[rand][2] = entity_position.y
 		end
 	end
 )
@@ -531,21 +532,21 @@ script.set_event_filter(defines.events.on_entity_died,
 script.on_event(defines.events.on_entity_damaged,
 	function(event)
 		-- If the biter is not in the no_regen list, add it
-		if not global.no_regen_biters[event.entity.unit_number] then
-			global.no_regen_biters[event.entity.unit_number] = { entity = event.entity, last_health = 3000 }
+		if not _ENV.no_regen_biters[event.entity.unit_number] then
+			_ENV.no_regen_biters[event.entity.unit_number] = { entity = event.entity, last_health = 3000 }
 		end
 
-		local previous_health = global.no_regen_biters[event.entity.unit_number].last_health
+		local previous_health = _ENV.no_regen_biters[event.entity.unit_number].last_health
 		local damage = event.final_damage_amount
 		-- Reduce incoming damage
-		local reduced_damage = damage * (1 / (global.biter_hp/3000))
+		local reduced_damage = damage * (1 / (_ENV.biter_hp/3000))
 
 
 		--convert the entity to string
 		event.entity.health = previous_health - reduced_damage
-		global.no_regen_biters[event.entity.unit_number].last_health = event.entity.health
+		_ENV.no_regen_biters[event.entity.unit_number].last_health = event.entity.health
 		if event.entity.health <= 0 then
-			global.no_regen_biters[event.entity.unit_number] = nil
+			_ENV.no_regen_biters[event.entity.unit_number] = nil
 		end
 	end,{ {filter = "name", name = "behemoth-biter"} }
 )
@@ -617,12 +618,12 @@ local on_build_base_arrived = function(event)
 			local retries = 0
 			local unit = members[i]
 			--confirm in the conversion map
-			if global.spitter_to_worm_conversion_map[unit.name] and converted_units < (game.ticks_played / (3600* 2)) then
+			if _ENV.spitter_to_worm_conversion_map[unit.name] and converted_units < (game.ticks_played / (3600* 2)) then
 				converted_units = converted_units + 1
 				-- attempt to place the worm within the radius`
 				local x_offset, y_offset = random_offset(15) -- 15-tile radius
 				local new_pos = { unit.position.x + x_offset, unit.position.y + y_offset }
-				local new_unit = surface.create_entity { name = global.spitter_to_worm_conversion_map[unit.name], position = new_pos, force = unit.force }
+				local new_unit = surface.create_entity { name = _ENV.spitter_to_worm_conversion_map[unit.name], position = new_pos, force = unit.force }
 			end
 			unit.destroy()
 		end
@@ -643,11 +644,11 @@ local on_biter_base_built = function(event)
 end
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 local on_rocket_launched = function(event)
-	if global.extremely_hard_victory == false then
+	if _ENV.extremely_hard_victory == false then
 		game.forces["enemy"].kill_all_units()
 		game.surfaces[1].clear_pollution()
 		game.map_settings.pollution.enabled = false
-		global.extremely_hard_victory = true
+		_ENV.extremely_hard_victory = true
 		game.set_game_state { game_finished = true, player_won = true, can_continue = true, victorious_force = player }
 	end
 end
@@ -739,13 +740,13 @@ local on_research_finished = function(event)
 end
 -------------------------------------------------------------------------------------------
 local on_research_cancelled = function(event)
-	if event.research[global.research] == 1 then
+	if event.research[_ENV.research] == 1 then
 		game.difficulty_settings.technology_price_multiplier = 1
 	end
 end
 -------------------------------------------------------------------------------------------
 local on_research_started = function(event)
-	global.research = event.research.name
+	_ENV.research = event.research.name
 	if (event.research.name == "nuclear-power") then
 		game.difficulty_settings.technology_price_multiplier = 0.5
 	end
@@ -771,24 +772,24 @@ local on_research_started = function(event)
 end
 -------------------------------------------------------------------------------------------
 local on_cutscene_waypoint_reached = function(event)
-	if not global.crash_site_cutscene_active then return end
+	if not _ENV.crash_site_cutscene_active then return end
 	if not crash_site.is_crash_site_cutscene(event) then return end
 
 	local player = game.get_player(event.player_index)
 
 	player.exit_cutscene()
 
-	if not global.skip_intro then
+	if not _ENV.skip_intro then
 		if game.is_multiplayer() then
-			player.print(global.custom_intro_message or { "msg-intro" })
+			player.print(_ENV.custom_intro_message or { "msg-intro" })
 		else
-			game.show_message_dialog { text = global.custom_intro_message or { "msg-intro" } }
+			game.show_message_dialog { text = _ENV.custom_intro_message or { "msg-intro" } }
 		end
 	end
 end
 
 local skip_crash_site_cutscene = function(event)
-	if not global.crash_site_cutscene_active then return end
+	if not _ENV.crash_site_cutscene_active then return end
 	if event.player_index ~= 1 then return end
 	local player = game.get_player(event.player_index)
 	if player.controller_type == defines.controllers.cutscene then
@@ -797,9 +798,9 @@ local skip_crash_site_cutscene = function(event)
 end
 
 local on_cutscene_cancelled = function(event)
-	if not global.crash_site_cutscene_active then return end
+	if not _ENV.crash_site_cutscene_active then return end
 	if event.player_index ~= 1 then return end
-	global.crash_site_cutscene_active = nil
+	_ENV.crash_site_cutscene_active = nil
 	local player = game.get_player(event.player_index)
 	if player.gui.screen.skip_cutscene_label then
 		player.gui.screen.skip_cutscene_label.destroy()
@@ -817,59 +818,59 @@ end
 local freeplay_interface =
 {
 	get_created_items = function()
-		return global.created_items
+		return _ENV.created_items
 	end,
 	set_created_items = function(map)
-		global.created_items = map or error("Remote call parameter to freeplay set created items can't be nil.")
+		_ENV.created_items = map or error("Remote call parameter to freeplay set created items can't be nil.")
 	end,
 	get_respawn_items = function()
-		return global.respawn_items
+		return _ENV.respawn_items
 	end,
 	set_respawn_items = function(map)
-		global.respawn_items = map or error("Remote call parameter to freeplay set respawn items can't be nil.")
+		_ENV.respawn_items = map or error("Remote call parameter to freeplay set respawn items can't be nil.")
 	end,
 	set_skip_intro = function(bool)
-		global.skip_intro = bool
+		_ENV.skip_intro = bool
 	end,
 	get_skip_intro = function()
-		return global.skip_intro
+		return _ENV.skip_intro
 	end,
 	set_custom_intro_message = function(message)
-		global.custom_intro_message = message
+		_ENV.custom_intro_message = message
 	end,
 	get_custom_intro_message = function()
-		return global.custom_intro_message
+		return _ENV.custom_intro_message
 	end,
 	set_chart_distance = function(value)
-		global.chart_distance = tonumber(value) or
+		_ENV.chart_distance = tonumber(value) or
 			error("Remote call parameter to freeplay set chart distance must be a number")
 	end,
 	get_disable_crashsite = function()
-		return global.disable_crashsite
+		return _ENV.disable_crashsite
 	end,
 	set_disable_crashsite = function(bool)
-		global.disable_crashsite = bool
+		_ENV.disable_crashsite = bool
 	end,
 	get_init_ran = function()
-		return global.init_ran
+		return _ENV.init_ran
 	end,
 	get_ship_items = function()
-		return global.crashed_ship_items
+		return _ENV.crashed_ship_items
 	end,
 	set_ship_items = function(map)
-		global.crashed_ship_items = map or error("Remote call parameter to freeplay set created items can't be nil.")
+		_ENV.crashed_ship_items = map or error("Remote call parameter to freeplay set created items can't be nil.")
 	end,
 	get_debris_items = function()
-		return global.crashed_debris_items
+		return _ENV.crashed_debris_items
 	end,
 	set_debris_items = function(map)
-		global.crashed_debris_items = map or error("Remote call parameter to freeplay set respawn items can't be nil.")
+		_ENV.crashed_debris_items = map or error("Remote call parameter to freeplay set respawn items can't be nil.")
 	end,
 	get_ship_parts = function()
-		return global.crashed_ship_parts
+		return _ENV.crashed_ship_parts
 	end,
 	set_ship_parts = function(parts)
-		global.crashed_ship_parts = parts or error("Remote call parameter to freeplay set ship parts can't be nil.")
+		_ENV.crashed_ship_parts = parts or error("Remote call parameter to freeplay set ship parts can't be nil.")
 	end
 }
 
@@ -910,30 +911,30 @@ freeplay.events =
 
 
 freeplay.on_configuration_changed = function()
-	global.created_items = global.created_items or created_items()
-	global.respawn_items = global.respawn_items or respawn_items()
-	global.crashed_ship_items = global.crashed_ship_items or ship_items()
-	global.crashed_debris_items = global.crashed_debris_items or debris_items()
-	global.crashed_ship_parts = global.crashed_ship_parts or ship_parts()
+	_ENV.created_items = _ENV.created_items or created_items()
+	_ENV.respawn_items = _ENV.respawn_items or respawn_items()
+	_ENV.crashed_ship_items = _ENV.crashed_ship_items or ship_items()
+	_ENV.crashed_debris_items = _ENV.crashed_debris_items or debris_items()
+	_ENV.crashed_ship_parts = _ENV.crashed_ship_parts or ship_parts()
 
-	if not global.init_ran then
+	if not _ENV.init_ran then
 		-- migrating old saves.
-		global.init_ran = #game.players > 0
+		_ENV.init_ran = #game.players > 0
 	end
 end
 
 
 freeplay.on_init = function()
-	global.created_items = created_items()
-	global.respawn_items = respawn_items()
-	global.crashed_ship_items = ship_items()
-	global.crashed_debris_items = debris_items()
-	global.crashed_ship_parts = ship_parts()
+	_ENV.created_items = created_items()
+	_ENV.respawn_items = respawn_items()
+	_ENV.crashed_ship_items = ship_items()
+	_ENV.crashed_debris_items = debris_items()
+	_ENV.crashed_ship_parts = ship_parts()
 	resetVariables()
 
 	if is_debug() then
-		global.skip_intro = true
-		global.disable_crashsite = true
+		_ENV.skip_intro = true
+		_ENV.disable_crashsite = true
 	end
 end
 

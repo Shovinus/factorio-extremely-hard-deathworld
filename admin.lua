@@ -14,7 +14,7 @@ function admin.get_admin_players()
 end
 
 -- Track if the player is holding the custom deconstruction planner
-global.player_holding_custom_planner = global.player_holding_custom_planner or {}
+_ENV.player_holding_custom_planner = _ENV.player_holding_custom_planner or {}
 
 -- Function to give the player a deconstruction planner with special configuration
 local landfill_tile_name = "landfill"
@@ -33,7 +33,7 @@ local function give_custom_deconstruction_planner(player)
             planner.entity_filters = {}                   -- Clear
             planner.tile_selection_mode = defines.deconstruction_item.tile_selection_mode.only
             -- Mark that the player is holding the custom deconstruction planner
-            global.player_holding_custom_planner[player.index] = true
+            _ENV.player_holding_custom_planner[player.index] = true
 
             player.print("You have been given a custom deconstruction planner for removing landfill.")
         else
@@ -49,12 +49,12 @@ function admin.on_player_cursor_stack_changed(event)
     local player = game.players[event.player_index]
 
     -- Check if the player was holding the custom deconstruction planner
-    if global.player_holding_custom_planner[player.index] then
+    if _ENV.player_holding_custom_planner[player.index] then
         local cursor_stack = player.cursor_stack
 
         -- If the player is no longer holding the custom deconstruction planner
         if not cursor_stack.valid_for_read or cursor_stack.name ~= "deconstruction-planner" then
-            global.player_holding_custom_planner[player.index] = false
+            _ENV.player_holding_custom_planner[player.index] = false
 
             -- Try to delete the custom deconstruction planner from their inventory
             local main_inventory = player.get_main_inventory()
@@ -76,18 +76,18 @@ end
 -- Store the deconstruction event
 function admin.store_deconstruction_event(player_name, area, surface)
     -- Ensure the history exists
-    global.deconstruction_history = global.deconstruction_history or {}
+    _ENV.deconstruction_history = _ENV.deconstruction_history or {}
 
     -- Add the new deconstruction event to the history
-    table.insert(global.deconstruction_history, {
+    table.insert(_ENV.deconstruction_history, {
         player_name = player_name,
         area = area,
         surface = surface
     })
 
     -- Limit the history to the last 20 entries
-    if #global.deconstruction_history > 20 then
-        table.remove(global.deconstruction_history, 1) -- Remove the oldest entry
+    if #_ENV.deconstruction_history > 20 then
+        table.remove(_ENV.deconstruction_history, 1) -- Remove the oldest entry
     end
 end
 
@@ -193,7 +193,7 @@ function admin.on_gui_click(event)
     -- Handle showing last 20 deconstructions
     if event.element.name == "show_last_20_decons" then
         -- Loop through the last 20 deconstruction events and highlight each one
-        for _, decon_event in ipairs(global.deconstruction_history or {}) do
+        for _, decon_event in ipairs(_ENV.deconstruction_history or {}) do
             admin.highlight_deconstruction_area(decon_event.surface, decon_event.area, decon_event.player_name)
         end
     end
@@ -230,7 +230,7 @@ function admin.on_player_deconstructed_area(event)
     admin.store_deconstruction_event(player.name, area, surface)
 
     -- Check if the player is holding the custom deconstruction planner (for landfill removal)
-    if global.player_holding_custom_planner[player.index] then
+    if _ENV.player_holding_custom_planner[player.index] then
         local cursor_stack = player.cursor_stack
 
         -- Check if the cursor stack contains the custom deconstruction planner (identified by its tile filter)
@@ -291,7 +291,7 @@ function admin.on_player_deconstructed_area(event)
                 end
 
                 -- Mark that the player is no longer holding the custom planner
-                global.player_holding_custom_planner[player.index] = false
+                _ENV.player_holding_custom_planner[player.index] = false
             else
                 player.print("You're not holding the custom deconstruction planner.")
             end
