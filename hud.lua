@@ -30,8 +30,8 @@ function hud.create_top_left_gui(player)
         end
     end
     
-    local evolution_factor = game.forces["enemy"].evolution_factor * 100 -- Convert to percentage
-    local biter_hp = global.biter_hp;
+    local evolution_factor = game.forces["enemy"].get_evolution_factor(1) * 100 -- Convert to percentage
+    local biter_hp = storage.biter_hp;
     -- convert ticks to friendly time
     local ticks = game.ticks_played
     local seconds = ticks / 60
@@ -53,7 +53,7 @@ function hud.create_top_left_gui(player)
 end
 
 --every second update the admin panel with stats
-script.on_nth_tick(60, function()
+script.on_nth_tick(30, function()
     for _, player in pairs(game.players) do
         hud.create_top_left_gui(player)
     end

@@ -60,13 +60,13 @@ function welcome.on_player_joined(event)
     local player = game.get_player(event.player_index)
 
     -- Check if the player is joining for the first time
-    if not global.joined_players then
-        global.joined_players = {}
+    if not storage.joined_players then
+        storage.joined_players = {}
     end
 
     -- If the player is not in the joined list, show the pop-up
-    if not global.joined_players[player.name] then
-        global.joined_players[player.name] = true
+    if not storage.joined_players[player.name] then
+        storage.joined_players[player.name] = true
         welcome.show_welcome_popup(player)  -- Show the welcome popup
     end
 end
@@ -89,7 +89,7 @@ end
     end)
     commands.add_command("mode", "Show the current mode", function(cmd)
         local player = game.players[cmd.player_index]
-        player.print(string.format("[color=yellow]Hardmode is currently [/color][color=%s[/color]",  global.hard_mode and "red]on" or "green]off"))
+        player.print(string.format("[color=yellow]Hardmode is currently [/color][color=%s[/color]",  storage.hard_mode and "red]on" or "green]off"))
     end)
 
     local lib = {}

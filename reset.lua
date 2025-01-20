@@ -1,7 +1,7 @@
 -- reset.lua
 
 local reset_controller = {}
-
+commands.add_command("debug","Toggles the debug override, only works in single player mode", function(command) storage.debug_override = not storage.debug_override end)
 commands.add_command("reset", "Resets map with random seed. Accepts a valid seed and 'true' or 'false' for hard_mode as parameters, in any order.", function(command)
 	local player = game.get_player(command.player_index)
 	if player.admin == true then
@@ -24,21 +24,21 @@ commands.add_command("reset", "Resets map with random seed. Accepts a valid seed
 		-- Handle the seed
 		if seed then
 			if seed > 0 and seed < 4294967296 then
-				global.reset_seed = seed
+				storage.reset_seed = seed
 			else
 				player.print("Invalid seed value. Seed must be between 1 and 4294967295.")
 				return
 			end
 		else
-			global.reset_seed = math.random(1111, 4294967295)
+			storage.reset_seed = math.random(1111, 4294967295)
 		end
 
 		-- Handle the hard_mode
 		if hard_mode_str then
 			if hard_mode_str == "true" then
-				global.hard_mode = true
+				storage.hard_mode = true
 			elseif hard_mode_str == "false" then
-				global.hard_mode = false
+				storage.hard_mode = false
 			else
 				player.print("Invalid hard_mode value. Must be 'true' or 'false'.")
 				return
