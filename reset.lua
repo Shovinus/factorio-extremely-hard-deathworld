@@ -45,7 +45,7 @@ commands.add_command("reset", "Resets map with random seed. Accepts a valid seed
 			end
 		end
 		
-		reset(string.format("%s has manually forced a reset.", player.name))
+		reset(string.format("%s has manually forced a reset.", player.name))		
 	end
 end)
 

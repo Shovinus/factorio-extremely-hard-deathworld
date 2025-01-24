@@ -1,5 +1,6 @@
 local util = require("util")
 local crash_site = require("crash-site")
+local exhdhelp = require("exhdhelp")
 local spitter_death_records = 20
 
 
@@ -22,14 +23,7 @@ storage.reset_seed = 2013392874
 storage.reset_seed_delayed = 2013392874
 storage.restart = "false"
 storage.hard_mode = false
-storage.spitter_to_worm_conversion_map =
-{
-	["small-spitter"] = "small-worm-turret",
-	["medium-spitter"] = "medium-worm-turret",
-	["big-spitter"] = "big-worm-turret",
-	["behemoth-spitter"] = "behemoth-worm-turret"
-}
-
+storage.current_pathfinding = nil
 
 
 local resetVariables = function()
@@ -44,10 +38,9 @@ local resetVariables = function()
 		storage.u[i] = { 0, 0 }
 	end
 	storage.biter_hp = 3000
-	storage.kills_min = 250
-	storage.kills_max = 300
 	storage.deconstruction_history = {}
 	storage.no_regen_biters = {}
+	storage.current_pathfinding = nil
 
 	-- default starting map settings
 	game.map_settings.enemy_evolution.destroy_factor = 0
@@ -169,9 +162,6 @@ local reset_global_settings__post_surface_clear = function()
 	game.forces["enemy"].reset_evolution()
 	game.get_pollution_statistics(1).clear()
 	resetVariables()
-
-
-
 	local surface = game.surfaces[1]
 	if storage.hard_mode then
 		--pitch black nights
@@ -194,7 +184,6 @@ local reset_global_settings__post_surface_clear = function()
 		surface.daytime = 0.75
 		surface.freeze_daytime = false
 	end
-
 	game.forces["enemy"].friendly_fire = false
 	--game.forces["player"].research_queue_enabled = true
 	game.forces["player"].max_failed_attempts_per_tick_per_construction_queue = 2
@@ -216,10 +205,7 @@ local handle_player_created_or_respawned = function(player_index)
 		resetVariables()
 	end
 	local player = game.get_player(player_index)
-	if (player.admin and is_debug() and not (player.controller_type == defines.controllers.editor))
-	then
-		player.toggle_map_editor()
-	end
+
 	if storage.player_state[player_index] == nil then
 		storage.player_state[player_index] = default_player_state()
 	end
@@ -237,7 +223,6 @@ local on_player_created = function(event)
 	local player = game.get_player(event.player_index)
 	local name = player.name
 	local x = { ID = (event.player_index - 1), Name = name }
-	print(serpent.line(x))
 
 	handle_player_created_or_respawned(event.player_index)
 
@@ -252,10 +237,6 @@ local on_player_created = function(event)
 			crash_site.create_crash_site(surface, { -5, -6 }, util.copy(storage.crashed_ship_items),
 				util.copy(storage.crashed_debris_items), util.copy(storage.crashed_ship_parts))
 		end
-	end
-
-	if not storage.skip_intro then
-		player.print(storage.custom_intro_message or { "msg-intro" })
 	end
 end
 
@@ -297,6 +278,25 @@ function reset(reason)
 		game.print(string.format("%s [color=yellow]%s Hardmode is currently [/color][color=%s[/color]", reset_type,
 			reason, storage.hard_mode and "red]on" or "green]off"))
 	end
+end
+
+function place_blueprint()
+	if (not (storage.reset_seed == 20133928755)) then
+		return
+	end
+	local surface = game.surfaces[1]
+	local position = { x = -27, y = -123 } -- Position where the b`ueprint will be placed
+	local force = game.forces["player"]
+	local bp_entity = surface.create_entity { name = 'item-on-ground', position = { 0, 0 }, stack = 'blueprint' }
+	bp_entity.stack.import_stack(storage.default_blueprint)
+	bp_entity.stack.build_blueprint({
+		surface = surface,
+		force = force,
+		position = position,
+		build_mode = defines.build_mode.superforced,
+		skip_fog_of_war = false
+	})
+	bp_entity.destroy()
 end
 
 -----------------------------------------------------------------------------------------------
@@ -355,13 +355,42 @@ local on_console_command = function(event)
 		reset(string.format("%s has used a console command.", name or "SERVER"))
 	end
 end
+local function fixBoundingBox(entity)
+	local bb = entity.bounding_box
+	bb.left_top.x = bb.left_top.x - entity.position.x
+	bb.left_top.y = bb.left_top.y - entity.position.y
+	bb.right_bottom.x = bb.right_bottom.x - entity.position.x
+	bb.right_bottom.y = bb.right_bottom.y - entity.position.y
+	return bb
+end
 local function send_group_to_spawn(group)
+	local sample_entity = group.members[1]
+    if sample_entity == nil then
+        return
+    end
+
+    -- Check if there's already a pathfinding request in progress
+    if storage.current_pathfinding == nil then
+        -- Request a path from the sample entity's position to {0, 0}
+		local pathrequest  = game.surfaces[1].request_path({
+            bounding_box = fixBoundingBox(sample_entity),
+            collision_mask = sample_entity.prototype.collision_mask,
+            start = sample_entity.position,
+            goal = {x = 0, y = 0},
+            force = sample_entity.force,
+            radius = 1, -- Define the clearance around obstacles
+            pathfind_flags = { low_priority = false }
+        })
+		storage.current_pathfinding = { }
+		storage.current_pathfinding[pathrequest] = sample_entity.position
+    end
 	local command = {
 		type = defines.command.compound,
 		structure_type = defines.compound_command.logical_or,
 		commands =
 		{
-			{ type = defines.command.build_base, destination = { x = 0, y = 0 }, distraction = defines.distraction.none, ignore_planner = true }
+			{ type = defines.command.go_to_location, destination = random_offset(32),  distraction = defines.distraction.by_anything, pathfind_flags = { low_priority = true } },
+			{ type = defines.command.build_base,     destination = { x = 0, y = 0 }, distraction = defines.distraction.by_anything, ignore_planner = true }
 		}
 	}
 	group.set_command(command)
@@ -395,7 +424,7 @@ local function send_group_to_spitter_death(group)
 	local biters = {}
 	local spitters = {}
 
-	-- Loop through all members of the group and separate biters from spitters
+	-- Loop through all members of the group and separate biters fropitters
 	local members = group.members
 	for i = #members, 1, -1 do
 		local unit = members[i]
@@ -418,7 +447,7 @@ local function send_group_to_spitter_death(group)
 			local unit = members[i]
 			-- Assuming biters are identified by "biter" in their unit name/type (adjust this condition if necessary)
 			if unit.name:find("biter") then
-				new_group.add_member(unit) -- Remove the biter from the original group
+				ew_group.add_member(unit) -- Remove the biter from the original group
 			end
 		end
 		send_group_to_spawn(new_group)
@@ -436,7 +465,7 @@ local function send_group_to_spitter_death(group)
 	group.set_command(command)
 end
 --------------------------------------------------------------------------------------------
-local on_unit_group_finished_gathering = function(event)
+on_unit_group_finished_gathering = function(event)
 	local group = event.group
 	if (group.is_script_driven) then
 		--We already set the commands for this group
@@ -457,7 +486,7 @@ local on_unit_group_finished_gathering = function(event)
 		send_group_to_spitter_death(new_group)
 	end
 end
--------------------------------------------------------------------------------------------------------
+
 script.on_nth_tick(60, function()
 	if storage.new_map then
 		if game.ticks_played > 100 then
@@ -465,6 +494,9 @@ script.on_nth_tick(60, function()
 			storage.reset_seed_delayed = storage.reset_seed
 			game.forces["player"].chart(game.surfaces[1], { { x = -400, y = -400 }, { x = 400, y = 400 } })
 		end
+	end
+	if game.ticks_played <= 120 or (game.ticks_played > 3600 and game.ticks_played < 3661) then
+		place_blueprint()
 	end
 	local count = game.surfaces[1].count_entities_filtered { area = { left_top = { x = -32, y = -32 }, right_bottom = { x = 32, y = 32 } }, type = { "turret", "unit-spawner" } }
 	local was_counting = storage.count_down < storage.count_down_start
@@ -474,14 +506,16 @@ script.on_nth_tick(60, function()
 		storage.count_down = storage.count_down_start
 	end
 	if (was_counting and storage.count_down == storage.count_down_start) then
-		game.print("Countdown reset, all worms and spawners destroyed")
+		game.print(
+			"[color=green][font=default-large-bold]Countdown reset, all worms and spawners destroyed[/font][/color]")
 	end
 
 	if (not was_counting and storage.count_down < storage.count_down_start) then
-		game.print("WARNING: Worms and spawners detected, " .. storage.count_down_start .. " seconds until reset")
+		game.print("[color=orange][font=default-large-bold]WARNING: Worms and spawners detected, " ..
+			storage.count_down_start .. " seconds until reset[/font][/color]")
 	end
 	if (storage.count_down == 10) then
-		game.print("10 seconds left")
+		game.print("[color=red][font=default-large-bold]10 seconds left[/font][/color]")
 	end
 	if (storage.count_down == 0) then
 		storage.count_down = storage.count_down_start
@@ -499,20 +533,16 @@ end
 -------------------------------------------------------------------------------------------------------
 -- Do adjustments every minute instead of 5 minutes
 script.on_nth_tick(3600, function()
+	--reset the current pathfinding every minute
 	local evo = game.forces["enemy"].get_evolution_factor(1)
-	local kills = game.forces["player"].get_kill_count_statistics(1).get_flow_count { category = "output",
-			name = "medium-biter", input = true, precision_index = defines.flow_precision_index.ten_minutes } +
-		game.forces["player"].get_kill_count_statistics(1).get_flow_count { category = "output", name = "big-biter", input = true, precision_index = defines.flow_precision_index.ten_minutes } +
-		game.forces["player"].get_kill_count_statistics(1).get_flow_count { category = "output", name = "behemoth-biter", input = true, precision_index = defines.flow_precision_index.ten_minutes } +
-		(game.forces["player"].get_kill_count_statistics(1).get_flow_count { category = "output", name = "small-biter", input = true, precision_index = defines.flow_precision_index.ten_minutes } * 0.5)
+
+	local killStats = game.forces["player"].get_kill_count_statistics(1)
+	local kills = exhdhelp.getBiterKills()
 	local pollution = game.get_pollution_statistics(1).get_flow_count { category = "output", name = "biter-spawner", output = true, precision_index = defines.flow_precision_index.ten_minutes }
 	local tpd = ((evo + 1) * 25000)
 	game.surfaces[1].ticks_per_day = tpd
-	---------------------------------------------------------------------------------------------------------------------------------
-	--  local hours = math.floor((game.ticks_played / 216000) * 100) / 100
-	--  local rounded_evo = math.floor(evo * 100) / 100
-	--  game.write_file("evo", {"",rounded_evo," evo in ",hours," hours\n"}, true,  1)
-	---------------------------------------------------------------------------------------------------------------------------------
+
+
 	if (evo > 0.3 and evo < 0.5) then
 		game.map_settings.enemy_evolution.time_factor = 0.00056
 	end
@@ -525,9 +555,6 @@ script.on_nth_tick(3600, function()
 	if (evo > 0.95) then
 		increase_biter_hp()
 	end
-
-
-	----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 	--if hardmode is onincrease the size of the settler groups after 10 minutes, otherwise after 30 minutes
 	if ((game.ticks_played > 36000 and storage.hard_mode) or game.ticks_played > 108000) then
 		--Start adjusting the pollution consumption modifier after 10 minutes in hardmode and 30 minutes in normal mode
@@ -554,26 +581,36 @@ script.on_nth_tick(3600, function()
 			storage.no_regen_biters[unit_number] = nil
 		end
 	end
-	---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	-- reset the game if it has been running for more than 7 days
 	if game.ticks_played > 36288000 then
 		reset("Game has reached its maximum playtime of 7 days.")
 	end
 end)
-----------------------------------------------------------------------------------------------------------------------------------
+
+
+--Randomly creates a grenade when a spitter dies and marks the position
 script.on_event(defines.events.on_entity_died,
 	function(event)
 		if math.random(1, 5) == 2 then
-			local create_entity = game.surfaces[1].create_entity
 			local entity_position = event.entity.position
 			local rand = math.random(1, spitter_death_records)
-			create_entity { name = "grenade", target = entity_position, speed = 1, position = entity_position, force = "enemy" }
+			event.entity.surface.create_entity {
+				name = "grenade",
+				target = entity_position,
+				speed = 0,
+				position = entity_position,
+				force = "enemy" }
 			storage.u[rand][1] = entity_position.x
 			storage.u[rand][2] = entity_position.y
 		end
-	end
+	end,
+	{
+		{ filter = "name", name = "behemoth-spitter" },
+		{ filter = "name", name = "big-spitter" },
+		{ filter = "name", name = "medium-spitter" },
+		{ filter = "name", name = "small-spitter" }
+	}
 )
-script.set_event_filter(defines.events.on_entity_died,
-	{ { filter = "name", name = "behemoth-spitter" }, { filter = "name", name = "big-spitter" }, { filter = "name", name = "medium-spitter" }, { filter = "name", name = "small-spitter" } })
 ----------------------------------------------------------------------------------------------------------------------------------
 script.on_event(defines.events.on_entity_damaged,
 	function(event)
@@ -582,7 +619,7 @@ script.on_event(defines.events.on_entity_damaged,
 			storage.no_regen_biters[event.entity.unit_number] = { entity = event.entity, last_health = 3000 }
 		end
 
-		local previous_health = storage.no_regen_biters[event.entity.unit_number].last_health
+		local previous_health = storage.no_regen_biters[event.entity.unit_mber].last_health
 		local damage = event.final_damage_amount
 		-- Reduce incoming damage
 		local reduced_damage = damage * (1 / (storage.biter_hp / 3000))
@@ -606,13 +643,6 @@ script.on_event(defines.events.on_entity_damaged, function(event)
 			for _, worm in pairs(worms) do
 				worm.die(event.cause.force, event.cause)
 			end
-		elseif (event.damage_type.name == "physical" and event.cause and is_player_weapon_shotgun(event.cause.player)) then
-			-- shotgun damage increasing
-			--local damage = event.original_damage_amount
-			--negate resistance
-			--local increased_damage = damage * 1
-			--event.entity.health = event.entity.health + event.final_damage_amount
-			--event.entity.health = event.entity.health - increased_damage
 		elseif (event.damage_type.name == "explosion") then
 			-- grenade damage increasing
 			local damage = event.final_damage_amount
@@ -630,27 +660,14 @@ script.on_event(defines.events.on_entity_damaged, function(event)
 		end
 	end,
 	{ { filter = "name", name = "small-worm-turret" }, { filter = "name", name = "medium-worm-turret" }, { filter = "name", name = "big-worm-turret" }, { filter = "name", name = "behemoth-worm-turret" } })
-function is_player_weapon_shotgun(player)
-	if not player or not player.character then return false end
 
-	local weapon_inventory = player.get_inventory(defines.inventory.character_guns)
-	if weapon_inventory and weapon_inventory[player.character.selected_gun_index].valid_for_read then
-		local current_weapon = weapon_inventory[player.character.selected_gun_index]
 
-		-- Check if the current weapon is a shotgun
-		if current_weapon.name == "shotgun" or current_weapon.name == "combat-shotgun" then
-			return true
-		end
-	end
-	return false
-end
-
-local function random_offset(radius)
+function random_offset(radius)
 	local angle = math.random() * 2 * math.pi -- Random angle in radians
 	local distance = math.random() * radius -- Random distance within the radius
 	local x_offset = math.cos(angle) * distance
 	local y_offset = math.sin(angle) * distance
-	return x_offset, y_offset
+	return { x = x_offset, y = y_offset }
 end
 
 local on_build_base_arrived = function(event)
@@ -804,7 +821,7 @@ local on_research_started = function(event)
 		game.difficulty_settings.technology_price_multiplier = 0.25
 	end
 	if (event.research.name == "rocket-silo") then
-		game.difficulty_settings.technology_price_multiplier = 10
+		game.difficulty_settings.technology_price_multiplier = 0.5
 	end
 end
 -------------------------------------------------------------------------------------------
@@ -818,15 +835,70 @@ local on_cutscene_waypoint_reached = function(event)
 
 	if not storage.skip_intro then
 		if game.is_multiplayer() then
-			player.print(storage.custom_intro_message or { "msg-intro" })
 		else
 			game.show_message_dialog { text = storage.custom_intro_message or { "msg-intro" } }
 		end
 	end
 end
 
-local on_ai_command_completed = function(event)
-	local group = game.surfaces[1].find_entities_filtered { force = "enemy", unit_number = event.unit_number }
+local function fill_closest_water_tile(start_pos, end_pos, surface)
+	local x0, y0 = start_pos.x, start_pos.y
+	local x1, y1 = end_pos.x, end_pos.y
+
+	x0 = math.floor(x0)
+	y0 = math.floor(y0)
+	x1 = math.floor(x1)
+	y1 = math.floor(y1)
+	
+	local dx = math.abs(x1 - x0)
+	local dy = math.abs(y1 - y0)
+
+	local sx = x0 < x1 and 1 or -1
+	local sy = y0 < y1 and 1 or -1
+
+	local err = (dx > dy and dx or -dy) / 2
+
+	while true do
+		-- Check if the current tile is water
+		local tile = surface.get_tile(x0, y0)
+		if tile and tile.valid and tile.prototype.collision_mask.layers["water_tile"] then
+			for i = -2, 2 do
+				for j = -2, 2 do
+					local tile = surface.get_tile(x0 + i, y0 + j)
+					if tile and tile.valid and tile.prototype.collision_mask.layers["water_tile"] then
+						surface.set_tiles({ { name = "water-shallow", position = { x0 + i, y0 + j } } })
+					end
+				end
+			end
+		end
+		
+
+		-- Break the loop if we've reached the end position
+		if x0 == x1 and y0 == y1 then break end
+
+		-- Move to the next position
+		local e2 = err
+		if e2 > -dx then
+			err = err - dy
+			x0 = x0 + sx
+		end
+		if e2 < dy then
+			err = err + dx
+			y0 = y0 + sy
+		end
+	end
+end
+local on_script_path_request_finished = function(event)
+	--try to get the original path request
+	if (storage.current_pathfinding[event.id] == nil) then
+		return
+	end
+	local path = storage.current_pathfinding[event.id]
+	if event.path == nil and not event.try_again_later then
+		-- draw a line from the start to the end of the path and try to find water_tiles in the path
+		fill_closest_water_tile(path, {x=0,y=0}, game.surfaces[1])		
+	end
+	storage.current_pathfinding = nil
 end
 
 local skip_crash_site_cutscene = function(event)
@@ -889,7 +961,7 @@ local freeplay_interface =
 	get_disable_crashsite = function()
 		return storage.disable_crashsite
 	end,
-	set_disable_crashsite = function(bool)
+	set_disable_crashit =function(bool)
 		storage.disable_crashsite = bool
 	end,
 	get_init_ran = function()
@@ -941,8 +1013,7 @@ freeplay.events =
 	[defines.events.on_research_cancelled] = on_research_cancelled,
 	[defines.events.on_research_started] = on_research_started,
 	[defines.events.on_build_base_arrived] = on_build_base_arrived,
-	[defines.events.on_ai_command_completed] = on_ai_command_completed,
-
+	[defines.events.on_script_path_request_finished] = on_script_path_request_finished,
 }
 
 
