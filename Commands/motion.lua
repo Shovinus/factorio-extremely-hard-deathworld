@@ -157,13 +157,13 @@ function motioner.on_gui_click(event)
         if player.gui.top.top_panel.vote_panel then
             player.gui.top.top_panel.vote_panel.destroy()
         end
-        if (storage.motion.started + motion_vote_time < game.ticks_played) then
+        if (storage.motion == nil or storage.motion.started + motion_vote_time < game.ticks_played) then
             player.print("The vote has ended.")
             return
         end
         storage.motion.votes[player.name] = true
         local connected_players_number = #game.connected_players
-        local votes_required = matoor(connected_players_number * majority_required)
+        local votes_required = math.floor(connected_players_number * majority_required)
 
         local yes_votes_cast = 0
         for _, vote in pairs(storage.motion.votes) do
@@ -181,7 +181,7 @@ function motioner.on_gui_click(event)
         if player.gui.top.top_panel.vote_panel then
             player.gui.top.top_panel.vote_panel.destroy()
         end
-        if (storage.motion.started + motion_vote_time < game.ticks_played) then
+        if (storage.motion == nil or (storage.motion.started + motion_vote_time < game.ticks_played)) then
             player.print("The vote has ended.")
             return
         end

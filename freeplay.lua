@@ -1,11 +1,17 @@
 local util = require("util")
 local crash_site = require("crash-site")
-local exhdhelp = require("exhdhelp")
 local spitter_death_records = 20
 
+local e = require("utils.event")
+local enemies = require("utils.enemies")
+local g = require("utils.general")
 
 
-
+local inventories = {
+	defines.inventory.character_main,
+	defines.inventory.character_guns,
+	defines.inventory.character_ammo
+}
 ----We disable victory conditions of silo script because it doesn't work with soft reset
 storage.no_victory = true
 ---
@@ -42,7 +48,7 @@ local resetVariables = function()
 	storage.no_regen_biters = {}
 	storage.current_pathfinding = nil
 
-	
+
 	storage.motion = nil
 	-- default starting map settings
 	game.map_settings.enemy_evolution.destroy_factor = 0
@@ -242,9 +248,9 @@ local on_player_created = function(event)
 	end
 end
 
-local on_player_respawned = function(event)
+e.on(e.s.on_player_respawned, function(event)
 	handle_player_created_or_respawned(event.player_index)
-end
+end)
 ------------------------------------------------------------------------------------------------
 function reset(reason)
 	if (storage.newgame) then
@@ -275,6 +281,19 @@ function reset(reason)
 		change_seed()
 		game.surfaces[1].clear(true)
 		game.forces["player"].reset()
+		for _, pl in pairs(game.players) do
+			while (pl.crafting_queue ~= nil) do
+				pl.cancel_crafting { index = 1, count = pl.crafting_queue[1].count }
+			end
+			for _, inv in pairs(inventories) do
+				local inv = pl.get_inventory(inv)
+				if (inv ~= nil) then
+					inv.clear()
+				end
+			end
+			pl.teleport(g.add_random_offset(5,{5,5}), game.surfaces[1])
+			handle_player_created_or_respawned(pl.index)
+		end
 	end
 	if reason ~= nil then
 		game.print(string.format("%s [color=yellow]%s Hardmode is currently [/color][color=%s[/color]", reset_type,
@@ -282,44 +301,28 @@ function reset(reason)
 	end
 end
 
-function place_blueprint()
-	if (not (storage.reset_seed == 20133928755)) then
-		return
-	end
-	local surface = game.surfaces[1]
-	local position = { x = -27, y = -123 } -- Position where the b`ueprint will be placed
-	local force = game.forces["player"]
-	local bp_entity = surface.create_entity { name = 'item-on-ground', position = { 0, 0 }, stack = 'blueprint' }
-	bp_entity.stack.import_stack(storage.default_blueprint)
-	bp_entity.stack.build_blueprint({
-		surface = surface,
-		force = force,
-		position = position,
-		build_mode = defines.build_mode.superforced,
-		skip_fog_of_war = false
-	})
-	bp_entity.destroy()
-end
+-- function place_blueprint()
+-- 	if (not (storage.reset_seed == 20133928755)) then
+-- 		return
+-- 	end
+-- 	local surface = game.surfaces[1]
+-- 	local position = { x = -27, y = -123 } -- Position where the b`ueprint will be placed
+-- 	local force = game.forces["player"]
+-- 	local bp_entity = surface.create_entity { name = 'item-on-ground', position = { 0, 0 }, stack = 'blueprint' }
+-- 	bp_entity.stack.import_stack(storage.default_blueprint)
+-- 	bp_entity.stack.build_blueprint({
+-- 		surface = surface,
+-- 		force = force,
+-- 		position = position,
+-- 		build_mode = defines.build_mode.superforced,
+-- 		skip_fog_of_war = false
+-- 	})
+-- 	bp_entity.destroy()
+-- end
 
 -----------------------------------------------------------------------------------------------
 local on_pre_surface_cleared = function(event)
 	reset_global_setings__pre_surface_clear()
-
-	-- We need to kill all players _before_ the surface is cleared, so that
-	-- their inventory, and crafting queue, end up on the old surface
-	for _, pl in pairs(game.players) do
-		if pl.connected and pl.character ~= nil then
-			-- We call die() here because otherwise we will spawn a duplicate
-			-- character, who will carry over into the new surface
-			pl.character.die()
-		end
-		-- Setting [ticks_to_respawn] to 1 seems to consistantly kill offline
-		-- players. Calling this for online players will cause them instead be
-		-- respawned the next tick, skipping the 10 respawn second timer.
-		pl.ticks_to_respawn = 1
-		--  Need to teleport otherwise offline players will force generate many chunks on new surface at their position on old surface when they rejoin.
-		pl.teleport({ 0, 0 })
-	end
 end
 -----------------------------------------------------------------------------------------------
 local on_surface_cleared = function(event)
@@ -357,346 +360,10 @@ local on_console_command = function(event)
 		reset(string.format("%s has used a console command.", name or "SERVER"))
 	end
 end
-local function fixBoundingBox(entity)
-	local bb = entity.bounding_box
-	bb.left_top.x = bb.left_top.x - entity.position.x
-	bb.left_top.y = bb.left_top.y - entity.position.y
-	bb.right_bottom.x = bb.right_bottom.x - entity.position.x
-	bb.right_bottom.y = bb.right_bottom.y - entity.position.y
-	return bb
-end
-local function send_group_to_spawn(group)
-	local sample_entity = group.members[1]
-    if sample_entity == nil then
-        return
-    end
-    -- Check if there's already a pathfinding request in progress
-    if storage.current_pathfinding == nil then
-        -- Request a path from the sample entity's position to {0, 0}
-		local pathrequest  = game.surfaces[1].request_path({
-            bounding_box = fixBoundingBox(sample_entity),
-            collision_mask = sample_entity.prototype.collision_mask,
-            start = sample_entity.position,
-            goal = {x = 0, y = 0},
-            force = sample_entity.force,
-            radius = 1, -- Define the clearance around obstacles
-            pathfind_flags = { low_priority = false }
-        })
-		storage.current_pathfinding = { }
-		storage.current_pathfinding[pathrequest] = sample_entity.position
-    end
-	local command = {
-		type = defines.command.compound,
-		structure_type = defines.compound_command.return_last,
-		commands =
-		{
-			{ type = defines.command.go_to_location, destination = random_offset(32),  distraction = defines.distraction.by_anything, pathfind_flags = { low_priority = true } },
-			{ type = defines.command.wander, radius = 1, wander_in_group = true,ticks_to_wait = 10,  distraction = defines.distraction.none},
-			{ type = defines.command.build_base,     destination = { x = 0, y = 0 }, distraction = defines.distraction.none, ignore_planner = true }
-		}
-	}
-	group.set_command(command)
-end
 
 
-local function send_group_to_spitter_death(group)
-	-- Get the x and y positions of the event group
-	local x = group.position.x
-	local y = group.position.y
-
-	-- Loop through the storage.u table to calculate distances
-	local min_distance = 100000
-	local min_location = 1
-	for i = 1, spitter_death_records do
-		local dx = x - storage.u[i][1]
-		local dy = y - storage.u[i][2]
-		local distance = (dx * dx) + (dy * dy)
-		if distance < min_distance then
-			min_distance = distance
-			min_location = i
-		end
-	end
-	local destination = storage.u[min_location]
-	-- If the destination is 0,0, send the group to spawn as normal
-	if destination[1] == 0 and destination[2] == 0 then
-		send_group_to_spawn(group)
-		return
-	end
-
-	local biters = {}
-	local spitters = {}
-
-	-- Loop through all members of the group and separate biters fropitters
-	local members = group.members
-	for i = #members, 1, -1 do
-		local unit = members[i]
-		if unit.name:find("spitter") then
-			spitters[#spitters + 1] = unit
-		else
-			biters[#biters + 1] = unit
-		end
-	end
-	-- If the group has no spitters, send it to spawn
-	if #spitters == 0 then
-		send_group_to_spawn(group)
-		return
-	end
-	-- If the group has biters, create a new group and move the biters to it
-	if #biters > 0 then
-		local new_group = group.surface.create_unit_group({ position = group.position, force = group.force })
-		-- Loop through all members of the group and move biters to the new group
-		for i = #members, 1, -1 do
-			local unit = members[i]
-			-- Assuming biters are identified by "biter" in their unit name/type (adjust this condition if necessary)
-			if unit.name:find("biter") then
-				ew_group.add_member(unit) -- Remove the biter from the original group
-			end
-		end
-		send_group_to_spawn(new_group)
-	end
-	local command = {
-		type = defines.command.compound,
-		structure_type = defines.compound_command.logical_or,
-		commands =
-		{
-			{ type = defines.command.build_base, destination = storage.u[min_location], distraction = defines.distraction.none, ignore_planner = true }
-		}
-	}
-	--reset the location to 0,0 (to avoid continously sending these groups to the same location)
-	storage.u[min_location] = { 0, 0 }
-	group.set_command(command)
-end
---------------------------------------------------------------------------------------------
-on_unit_group_finished_gathering = function(event)
-	local group = event.group
-	if (group.is_script_driven) then
-		--We already set the commands for this group
-		return
-	end
-	-- Rebuild the group because if you try to command it as is, it will fail silently
-	local members = group.members
-	local new_group = group.surface.create_unit_group({ position = group.position, force = group.force })
-
-	for i = #members, 1, -1 do
-		local unit = members[i]
-		new_group.add_member(unit)
-	end
-
-	if math.random(1, 3) ~= 2 and false then
-		send_group_to_spawn(new_group)
-	else
-		send_group_to_spitter_death(new_group)
-	end
-end
-
-script.on_nth_tick(60, function()
-	if storage.new_map then
-		if game.ticks_played > 100 then
-			storage.new_map = false
-			storage.reset_seed_delayed = storage.reset_seed
-			game.forces["player"].chart(game.surfaces[1], { { x = -400, y = -400 }, { x = 400, y = 400 } })
-		end
-	end
-	if game.ticks_played <= 120 or (game.ticks_played > 3600 and game.ticks_played < 3661) then
-		place_blueprint()
-	end
-	local count = game.surfaces[1].count_entities_filtered { area = { left_top = { x = -32, y = -32 }, right_bottom = { x = 32, y = 32 } }, type = { "turret", "unit-spawner" } }
-	local was_counting = storage.count_down < storage.count_down_start
-	if (count > 0) then
-		storage.count_down = storage.count_down - 1
-	else
-		storage.count_down = storage.count_down_start
-	end
-	if (was_counting and storage.count_down == storage.count_down_start) then
-		game.print(
-			"[color=green][font=default-large-bold]Countdown reset, all worms and spawners destroyed[/font][/color]")
-	end
-
-	if (not was_counting and storage.count_down < storage.count_down_start) then
-		game.print("[color=orange][font=default-large-bold]WARNING: Worms and spawners detected, " ..
-			storage.count_down_start .. " seconds until reset[/font][/color]")
-	end
-	if (storage.count_down == 10) then
-		game.print("[color=red][font=default-large-bold]10 seconds left[/font][/color]")
-	end
-	if (storage.count_down == 0) then
-		storage.count_down = storage.count_down_start
-		reset("Worms and spawners overtook the spawn area")
-	end
-end)
-local increase_biter_hp = function()
-	local hp = storage.biter_hp
-	local pcent = storage.biter_hp_base_modifier
-	local s_hp = storage.biter_initial_hp
-	local t_hp = storage.biter_target_hp
-	-- Increase the biter hp by a percentage of the difference between the target hp and the current hp
-	storage.biter_hp = hp * (1 + (pcent - (pcent * ((hp - s_hp) / (t_hp - s_hp)))))
-end
--------------------------------------------------------------------------------------------------------
--- Do adjustments every minute instead of 5 minutes
-script.on_nth_tick(3600, function()
-	--reset the current pathfinding every minute
-	local evo = game.forces["enemy"].get_evolution_factor(1)
-
-	local killStats = game.forces["player"].get_kill_count_statistics(1)
-	local kills = exhdhelp.getBiterKills()
-	local pollution = game.get_pollution_statistics(1).get_flow_count { category = "output", name = "biter-spawner", output = true, precision_index = defines.flow_precision_index.ten_minutes }
-	local tpd = ((evo + 1) * 25000)
-	game.surfaces[1].ticks_per_day = tpd
 
 
-	if (evo > 0.3 and evo < 0.5) then
-		game.map_settings.enemy_evolution.time_factor = 0.00056
-	end
-	if (evo > 0.5 and evo < 0.7) then
-		game.map_settings.enemy_evolution.time_factor = 0.0008
-	end
-	if (evo > 0.7 and evo < 0.9) then
-		game.map_settings.enemy_evolution.time_factor = 0.004
-	end
-	if (evo > 0.95) then
-		increase_biter_hp()
-	end
-	--if hardmode is onincrease the size of the settler groups after 10 minutes, otherwise after 30 minutes
-	if ((game.ticks_played > 36000 and storage.hard_mode) or game.ticks_played > 108000) then
-		--Start adjusting the pollution consumption modifier after 10 minutes in hardmode and 30 minutes in normal mode
-		if pollution > 1 then
-			local current_modifier = game.map_settings.pollution.enemy_attack_pollution_consumption_modifier
-			if kills < storage.kills_min then
-				-- Decrease the pollution consumption modifier by 5% if the player has killed less than 250 biters in the last 10 minutes
-				game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = math.max(
-					current_modifier * 0.95, 0.01)
-			elseif kills > storage.kills_max then
-				game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = math.min(
-					game.map_settings.pollution.enemy_attack_pollution_consumption_modifier / 0.95, 1.5)
-			end
-		end
-		game.map_settings.enemy_expansion.settler_group_min_size = 90
-		game.map_settings.enemy_expansion.settler_group_max_size = 100
-	elseif (game.ticks_played > 36000) then -- if hardmode is off increase the size of the settler groups after 10 minutes
-		game.map_settings.enemy_expansion.settler_group_min_size = 20
-		game.map_settings.enemy_expansion.settler_group_max_size = 22
-	end
-	-- iterate through the storage.no_regen_biters and remove any invalid entries
-	for unit_number, biter in pairs(storage.no_regen_biters) do
-		if not biter.entity.valid then
-			storage.no_regen_biters[unit_number] = nil
-		end
-	end
-	-- reset the game if it has been running for more than 7 days
-	if game.ticks_played > 36288000 then
-		reset("Game has reached its maximum playtime of 7 days.")
-	end
-end)
-
-
---Randomly creates a grenade when a spitter dies and marks the position
-script.on_event(defines.events.on_entity_died,
-	function(event)
-		if math.random(1, 5) == 2 then
-			local entity_position = event.entity.position
-			local rand = math.random(1, spitter_death_records)
-			event.entity.surface.create_entity {
-				name = "grenade",
-				target = entity_position,
-				speed = 0,
-				position = entity_position,
-				force = "enemy" }
-			storage.u[rand][1] = entity_position.x
-			storage.u[rand][2] = entity_position.y
-		end
-	end,
-	{
-		{ filter = "name", name = "behemoth-spitter" },
-		{ filter = "name", name = "big-spitter" },
-		{ filter = "name", name = "medium-spitter" },
-		{ filter = "name", name = "small-spitter" }
-	}
-)
-----------------------------------------------------------------------------------------------------------------------------------
-script.on_event(defines.events.on_entity_damaged,
-	function(event)
-		-- If the biter is not in the no_regen list, add it
-		if not storage.no_regen_biters[event.entity.unit_number] then
-			storage.no_regen_biters[event.entity.unit_number] = { entity = event.entity, last_health = 3000 }
-		end
-
-		local previous_health = storage.no_regen_biters[event.entity.unit_number].last_health
-		local damage = event.final_damage_amount
-		-- Reduce incoming damage
-		local reduced_damage = damage * (1 / (storage.biter_hp / 3000))
-
-
-		--convert the entity to string
-		event.entity.health = previous_health - reduced_damage
-		storage.no_regen_biters[event.entity.unit_number].last_health = event.entity.health
-		if event.entity.health <= 0 then
-			storage.no_regen_biters[event.entity.unit_number] = nil
-		end
-	end, { { filter = "name", name = "behemoth-biter" } }
-)
--- Make worms more vunerable to artillery and grenades to counter the worm rush strategy
-script.on_event(defines.events.on_entity_damaged, function(event)
-		-- check if the damage was caused by artillery or artillery wagon
-		if (event.cause ~= nil and (event.cause.name == "artillery-turret" or event.cause.name == "artillery-wagon")) then
-			-- get all nearby worms within a radius of 20 tiles
-			local worms = event.entity.surface.find_entities_filtered { position = event.entity.position, radius = 20, type = "turret" }
-			-- loop through all worms
-			for _, worm in pairs(worms) do
-				worm.die(event.cause.force, event.cause)
-			end
-		elseif (event.damage_type.name == "explosion") then
-			-- grenade damage increasing
-			local damage = event.final_damage_amount
-			local original_damage = event.original_damage_amount
-			local reduced_damage = original_damage - damage
-			--reduce resistance
-			local adjusted_damage = damage + (reduced_damage / 2)
-			--4x dmg
-			local increased_damage = adjusted_damage * 4
-
-			--reset health to previous value
-			event.entity.health = event.entity.health + event.final_damage_amount
-			-- remove the modified health
-			event.entity.health = event.entity.health - increased_damage
-		end
-	end,
-	{ { filter = "name", name = "small-worm-turret" }, { filter = "name", name = "medium-worm-turret" }, { filter = "name", name = "big-worm-turret" }, { filter = "name", name = "behemoth-worm-turret" } })
-
-
-function random_offset(radius)
-	local angle = math.random() * 2 * math.pi -- Random angle in radians
-	local distance = math.random() * radius -- Random distance within the radius
-	local x_offset = math.cos(angle) * distance
-	local y_offset = math.sin(angle) * distance
-	return { x = x_offset, y = y_offset }
-end
-
-local on_build_base_arrived = function(event)
-	if (event.group.command ~= nil and
-			event.group.command.commands ~= nil and
-			event.group.command.commands[1].destination.x ~= 0 and
-			event.group.command.commands[1].destination.y ~= 0) then
-		--Spitter death group arrived, convert all spitters to worms
-		local surface = game.surfaces[1]
-		local group = event.group
-		local members = group.members
-		local converted_units = 0
-		for i = #members, 1, -1 do
-			local retries = 0
-			local unit = members[i]
-			--confirm in the conversion map
-			if storage.spitter_to_worm_conversion_map[unit.name] and converted_units < (game.ticks_played / (3600 * 2)) then
-				converted_units = converted_units + 1
-				-- attempt to place the worm within the radius`
-				local x_offset, y_offset = random_offset(15) -- 15-tile radius
-				local new_pos = { unit.position.x + x_offset, unit.position.y + y_offset }
-				local new_unit = surface.create_entity { name = storage.spitter_to_worm_conversion_map[unit.name], position = new_pos, force = unit.force }
-			end
-			unit.destroy()
-		end
-	end
-end
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 local on_rocket_launched = function(event)
@@ -827,108 +494,46 @@ local on_research_started = function(event)
 	end
 end
 -------------------------------------------------------------------------------------------
-local on_cutscene_waypoint_reached = function(event)
-	if not storage.crash_site_cutscene_active then return end
-	if not crash_site.is_crash_site_cutscene(event) then return end
-
-	local player = game.get_player(event.player_index)
-
-	player.exit_cutscene()
-
-	if not storage.skip_intro then
-		if game.is_multiplayer() then
-		else
-			game.show_message_dialog { text = storage.custom_intro_message or { "msg-intro" } }
-		end
-	end
-end
-
-local function fill_closest_water_tile(start_pos, end_pos, surface)
-	local x0, y0 = start_pos.x, start_pos.y
-	local x1, y1 = end_pos.x, end_pos.y
-
-	x0 = math.floor(x0)
-	y0 = math.floor(y0)
-	x1 = math.floor(x1)
-	y1 = math.floor(y1)
-	
-	local dx = math.abs(x1 - x0)
-	local dy = math.abs(y1 - y0)
-
-	local sx = x0 < x1 and 1 or -1
-	local sy = y0 < y1 and 1 or -1
-
-	local err = (dx > dy and dx or -dy) / 2
-
-	while true do
-		-- Check if the current tile is water
-		local tile = surface.get_tile(x0, y0)
-		if tile and tile.valid and tile.prototype.collision_mask.layers["water_tile"] then
-			for i = -2, 2 do
-				for j = -2, 2 do
-					local tile = surface.get_tile(x0 + i, y0 + j)
-					if tile and tile.valid and tile.prototype.collision_mask.layers["water_tile"] then
-						surface.set_tiles({ { name = "water-shallow", position = { x0 + i, y0 + j } } })
-					end
-				end
-			end
-		end
-		
-
-		-- Break the loop if we've reached the end position
-		if x0 == x1 and y0 == y1 then break end
-
-		-- Move to the next position
-		local e2 = err
-		if e2 > -dx then
-			err = err - dy
-			x0 = x0 + sx
-		end
-		if e2 < dy then
-			err = err + dx
-			y0 = y0 + sy
-		end
-	end
-end
-local on_script_path_request_finished = function(event)
-	--try to get the original path request
-	if (storage.current_pathfinding[event.id] == nil) then
-		return
-	end
-	local path = storage.current_pathfinding[event.id]
-	if event.path == nil and not event.try_again_later then
-		-- draw a line from the start to the end of the path and try to find water_tiles in the path
-		fill_closest_water_tile(path, {x=0,y=0}, game.surfaces[1])		
-	end
-	storage.current_pathfinding = nil
-end
-
-local skip_crash_site_cutscene = function(event)
-	if not storage.crash_site_cutscene_active then return end
-	if event.player_index ~= 1 then return end
-	local player = game.get_player(event.player_index)
-	if player.controller_type == defines.controllers.cutscene then
-		player.exit_cutscene()
-	end
-end
-
-local on_cutscene_cancelled = function(event)
-	if not storage.crash_site_cutscene_active then return end
-	if event.player_index ~= 1 then return end
-	storage.crash_site_cutscene_active = nil
-	local player = game.get_player(event.player_index)
-	if player.gui.screen.skip_cutscene_label then
-		player.gui.screen.skip_cutscene_label.destroy()
-	end
-	if player.character then
-		player.character.destructible = true
-	end
-	player.zoom = 1.5
-end
-
-local on_player_display_refresh = function(event)
-	crash_site.on_player_display_refresh(event)
-end
+-- local on_cutscene_waypoint_reached = function(event)
+-- 	if not storage.crash_site_cutscene_active then return end
+-- 	if not crash_site.is_crash_site_cutscene(event) then return end
+-- 	local player = game.get_player(event.player_index)
+-- 	player.exit_cutscene()
+-- 	if not storage.skip_intro then
+-- 		if game.is_multiplayer() then
+-- 		else
+-- 			game.show_message_dialog { text = storage.custom_intro_message or { "msg-intro" } }
+-- 		end
+-- 	end
+--end
+-------------------------------------------------------------------------------------------
+-- local skip_crash_site_cutscene = function(event)
+-- 	if not storage.crash_site_cutscene_active then return end
+-- 	if event.player_index ~= 1 then return end
+-- 	local player = game.get_player(event.player_index)
+-- 	if player.controller_type == defines.controllers.cutscene then
+-- 		player.exit_cutscene()
+-- 	end
+-- end
+-------------------------------------------------------------------------------------------
+-- local on_cutscene_cancelled = function(event)
+-- 	if not storage.crash_site_cutscene_active then return end
+-- 	if event.player_index ~= 1 then return end
+-- 	storage.crash_site_cutscene_active = nil
+-- 	local player = game.get_player(event.player_index)
+-- 	if player.gui.screen.skip_cutscene_label then
+-- 		player.gui.screen.skip_cutscene_label.destroy()
+-- 	end
+-- 	if player.character then
+-- 		player.character.destructible = true
+-- 	end
+-- 	player.zoom = 1.5
+-- end
+-------------------------------------------------------------------------------------------
+-- local on_player_display_refresh = function(event)
+-- 	crash_site.on_player_display_refresh(event)
+-- end
+-------------------------------------------------------------------------------------------
 
 local freeplay_interface =
 {
@@ -963,7 +568,7 @@ local freeplay_interface =
 	get_disable_crashsite = function()
 		return storage.disable_crashsite
 	end,
-	set_disable_crashit =function(bool)
+	set_disable_crashit = function(bool)
 		storage.disable_crashsite = bool
 	end,
 	get_init_ran = function()
@@ -1000,13 +605,13 @@ freeplay.events =
 {
 	[defines.events.on_player_created] = on_player_created,
 	[defines.events.on_player_respawned] = on_player_respawned,
-	[defines.events.on_cutscene_waypoint_reached] = on_cutscene_waypoint_reached,
-	["crash-site-skip-cutscene"] = skip_crash_site_cutscene,
-	[defines.events.on_player_display_resolution_changed] = on_player_display_refresh,
-	[defines.events.on_player_display_scale_changed] = on_player_display_refresh,
-	[defines.events.on_cutscene_cancelled] = on_cutscene_cancelled,
+	--[defines.events.on_cutscene_waypoint_reached] = on_cutscene_waypoint_reached,
+	--["crash-site-skip-cutscene"] = skip_crash_site_cutscene,
+	--[defines.events.on_player_display_resolution_changed] = on_player_display_refresh,
+	--[defines.events.on_player_display_scale_changed] = on_player_display_refresh,
+	--[defines.events.on_cutscene_cancelled] = on_cutscene_cancelled,
 	[defines.events.on_research_finished] = on_research_finished,
-	[defines.events.on_unit_group_finished_gathering] = on_unit_group_finished_gathering,
+	--[defines.events.on_unit_group_finished_gathering] = on_unit_group_finished_gathering,
 	[defines.events.on_rocket_launched] = on_rocket_launched,
 	[defines.events.on_pre_surface_cleared] = on_pre_surface_cleared,
 	[defines.events.on_surface_cleared] = on_surface_cleared,
@@ -1014,7 +619,6 @@ freeplay.events =
 	[defines.events.on_player_toggled_map_editor] = on_player_toggled_map_editor,
 	[defines.events.on_research_cancelled] = on_research_cancelled,
 	[defines.events.on_research_started] = on_research_started,
-	[defines.events.on_build_base_arrived] = on_build_base_arrived,
 	[defines.events.on_script_path_request_finished] = on_script_path_request_finished,
 }
 
@@ -1025,7 +629,6 @@ freeplay.on_configuration_changed = function()
 	storage.crashed_ship_items = storage.crashed_ship_items or ship_items()
 	storage.crashed_debris_items = storage.crashed_debris_items or debris_items()
 	storage.crashed_ship_parts = storage.crashed_ship_parts or ship_parts()
-
 	if not storage.init_ran then
 		-- migrating old saves.
 		storage.init_ran = #game.players > 0
@@ -1043,5 +646,25 @@ freeplay.on_init = function()
 
 	reset("Game has been initialized.")
 end
+e.nth_tick(60, function()
+	if storage.new_map then
+		if game.ticks_played > 100 then
+			storage.new_map = false
+			storage.reset_seed_delayed = storage.reset_seed
+			game.forces["player"].chart(game.surfaces[1], { { x = -400, y = -400 }, { x = 400, y = 400 } })
+		end
+	end
+end)
+
+e.nth_tick(60 * 60, function()
+	-- extend daytime over time	
+	local evo = game.forces["enemy"].get_evolution_factor(1)
+	local tpd = ((evo + 1) * 25000)
+	game.surfaces[1].ticks_per_day = tpd
+	-- reset the game if it has been running for more than 7 days
+	if game.ticks_played > 36288000 then
+		reset("Game has reached its maximum playtime of 7 days.")
+	end
+end)
 
 return freeplay
