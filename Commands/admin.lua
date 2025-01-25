@@ -314,12 +314,5 @@ commands.add_command("open_admin_panel", "Open the admin panel", function(cmd)
     admin.show_admin_panel(player)
 end)
 
--- Library event integration
-local lib = {}
-lib.events = {
-    [defines.events.on_player_joined_game] = admin.on_player_joined,
-    [defines.events.on_gui_click] = admin.on_gui_click,
-    [defines.events.on_player_deconstructed_area] = admin.on_player_deconstructed_area,
-    [defines.events.on_player_cursor_stack_changed] = admin.on_player_cursor_stack_changed, -- Add this line
-}
-return lib
+
+return admin

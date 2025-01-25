@@ -3,10 +3,6 @@
 local hud = {}
 
 
-
-
-
-
 -- Function to create the top-left button for admins
 function hud.create_top_left_gui(player)
     local top_panel = player.gui.top.top_panel
@@ -64,9 +60,4 @@ function hud.on_player_joined(event)
     local player = game.players[event.player_index]
     hud.create_top_left_gui(player)
 end
--- Library event integration
-local lib = {}
-lib.events = {
-    [defines.events.on_player_joined_game] = hud.on_player_joined
-}
-return lib
+return hud

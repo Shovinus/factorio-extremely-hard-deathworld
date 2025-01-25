@@ -1,7 +1,9 @@
 -- reset.lua
 
 local reset_controller = {}
+
 commands.add_command("debug","Toggles the debug override, only works in single player mode", function(command) storage.debug_override = not storage.debug_override end)
+
 commands.add_command("reset", "Resets map with random seed. Accepts a valid seed and 'true' or 'false' for hard_mode as parameters, in any order.", function(command)
 	local player = game.get_player(command.player_index)
 	if player.admin == true then

@@ -42,6 +42,8 @@ local resetVariables = function()
 	storage.no_regen_biters = {}
 	storage.current_pathfinding = nil
 
+	
+	storage.motion = nil
 	-- default starting map settings
 	game.map_settings.enemy_evolution.destroy_factor = 0
 	game.map_settings.enemy_evolution.pollution_factor = 0
@@ -368,7 +370,6 @@ local function send_group_to_spawn(group)
     if sample_entity == nil then
         return
     end
-
     -- Check if there's already a pathfinding request in progress
     if storage.current_pathfinding == nil then
         -- Request a path from the sample entity's position to {0, 0}
@@ -386,11 +387,12 @@ local function send_group_to_spawn(group)
     end
 	local command = {
 		type = defines.command.compound,
-		structure_type = defines.compound_command.logical_or,
+		structure_type = defines.compound_command.return_last,
 		commands =
 		{
 			{ type = defines.command.go_to_location, destination = random_offset(32),  distraction = defines.distraction.by_anything, pathfind_flags = { low_priority = true } },
-			{ type = defines.command.build_base,     destination = { x = 0, y = 0 }, distraction = defines.distraction.by_anything, ignore_planner = true }
+			{ type = defines.command.wander, radius = 1, wander_in_group = true,ticks_to_wait = 10,  distraction = defines.distraction.none},
+			{ type = defines.command.build_base,     destination = { x = 0, y = 0 }, distraction = defines.distraction.none, ignore_planner = true }
 		}
 	}
 	group.set_command(command)
@@ -619,7 +621,7 @@ script.on_event(defines.events.on_entity_damaged,
 			storage.no_regen_biters[event.entity.unit_number] = { entity = event.entity, last_health = 3000 }
 		end
 
-		local previous_health = storage.no_regen_biters[event.entity.unit_mber].last_health
+		local previous_health = storage.no_regen_biters[event.entity.unit_number].last_health
 		local damage = event.final_damage_amount
 		-- Reduce incoming damage
 		local reduced_damage = damage * (1 / (storage.biter_hp / 3000))
