@@ -27,6 +27,8 @@ function hud.create_top_left_gui(player)
     end
     
     local evolution_factor = game.forces["enemy"].get_evolution_factor(1) * 100 -- Convert to percentage
+
+
     local biter_hp = storage.biter_hp;
     -- convert ticks to friendly time
     local ticks = game.ticks_played

@@ -408,7 +408,7 @@ e.on(e.s.on_build_base_arrived, function(event)
                     converted_units = converted_units + 1
                     -- attempt to place the worm within the radius`
                     local new_pos = g.add_random_offset(15,unit.position)
-                    surface.create_entity { name = storage.spitter_to_worm_conversion_map[unit.name], 
+                    surface.create_entity { name = spitter_to_worm_conversion_map[unit.name], 
                     position = new_pos, force = unit.force }
                 end
                 unit.destroy()
