@@ -282,8 +282,10 @@ function reset(reason)
 		game.surfaces[1].clear(true)
 		game.forces["player"].reset()
 		for _, pl in pairs(game.players) do
-			while (pl.crafting_queue ~= nil) do
-				pl.cancel_crafting { index = 1, count = pl.crafting_queue[1].count }
+			if pl and pl.valid and pl.character and pl.character.health > 0 then
+				while (pl.crafting_queue ~= nil) do
+					pl.cancel_crafting { index = 1, count = pl.crafting_queue[1].count }
+				end
 			end
 			for _, inv in pairs(inventories) do
 				local inv = pl.get_inventory(inv)
@@ -291,7 +293,7 @@ function reset(reason)
 					inv.clear()
 				end
 			end
-			pl.teleport(g.add_random_offset(5,{5,5}), game.surfaces[1])
+			pl.teleport(g.add_random_offset(5, { 5, 5 }), game.surfaces[1])
 			handle_player_created_or_respawned(pl.index)
 		end
 	end
