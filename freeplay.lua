@@ -233,7 +233,7 @@ local handle_player_created_or_respawned = function(player_index)
 	end
 end
 
-local on_player_created = function(event)
+e.on(defines.events.on_player_created,function(event)
 	local player = game.get_player(event.player_index)
 	if(player == nil) then return end
 	local name = player.name
@@ -253,7 +253,7 @@ local on_player_created = function(event)
 				util.copy(storage.crashed_debris_items), util.copy(storage.crashed_ship_parts))
 		end
 	end
-end
+end)
 
 e.on(e.s.on_player_respawned, function(event)
 	handle_player_created_or_respawned(event.player_index)
@@ -331,11 +331,11 @@ end
 -- end
 
 -----------------------------------------------------------------------------------------------
-local on_pre_surface_cleared = function(event)
+e.on(defines.events.on_pre_surface_cleared,function(event)
 	reset_global_setings__pre_surface_clear()
-end
+end)
 -----------------------------------------------------------------------------------------------
-local on_surface_cleared = function(event)
+e.on(defines.events.on_surface_cleared,function(event)
 	reset_global_settings__post_surface_clear()
 
 	local surface = game.surfaces[1]
@@ -343,9 +343,9 @@ local on_surface_cleared = function(event)
 	surface.force_generate_chunk_requests()
 	crash_site.create_crash_site(surface, { -5, -6 }, util.copy(storage.crashed_ship_items),
 		util.copy(storage.crashed_debris_items), util.copy(storage.crashed_ship_parts))
-end
+end)
 ------------------------------------------------------------------------------------------
-local on_player_toggled_map_editor = function(event)
+e.on(defines.events.on_player_toggled_map_editor,function(event)
 	if (is_debug()) then
 		return
 	end
@@ -354,9 +354,9 @@ local on_player_toggled_map_editor = function(event)
 	local player = game.get_player(event.player_index)
 	if(player == nil) then return end
 	reset(string.format("%s has toggled the map editor.", player.name))
-end
+end)
 ------------------------------------------------------------------------------------------
-local on_console_command = function(event)
+e.on(defines.events.on_console_command,function(event)
 	local command = event.command
 	local parameters = event.parameters
 	print(command)
@@ -370,7 +370,7 @@ local on_console_command = function(event)
 		end
 		reset(string.format("%s has used a console command.", name or "SERVER"))
 	end
-end
+end)
 
 
 
@@ -475,23 +475,19 @@ e.on(defines.events.on_research_finished,function(event)
 	end
 end)
 -------------------------------------------------------------------------------------------
-local on_research_cancelled = function(event)
+e.on(defines.events.on_research_cancelled,function(event)
 	if event.research[storage.research] == 1 then
 		game.difficulty_settings.technology_price_multiplier = 1
 	end
-end
+end)
 -------------------------------------------------------------------------------------------
-local on_research_started = function(event)
+e.on(defines.events.on_research_started,function(event)
 	storage.research = event.research.name
 	if (event.research.name == "nuclear-power") then
 		game.difficulty_settings.technology_price_multiplier = 0.5
 	end
 	if (event.research.name == "spidertron") then
 		game.difficulty_settings.technology_price_multiplier = 0.16
-	end
-	-- cancel atomic bomb research
-	if (event.research.name == "atomic-bomb") then
-		game.forces["player"].cancel_current_research()		
 	end
 	if (event.research.name == "artillery") then
 		game.difficulty_settings.technology_price_multiplier = 0.2
@@ -505,7 +501,7 @@ local on_research_started = function(event)
 	if (event.research.name == "rocket-silo") then
 		game.difficulty_settings.technology_price_multiplier = 0.5
 	end
-end	
+end)
 -------------------------------------------------------------------------------------------
 -- local on_cutscene_waypoint_reached = function(event)
 -- 	if not storage.crash_site_cutscene_active then return end
@@ -614,24 +610,7 @@ end
 
 local freeplay = {}
 
-freeplay.events =
-{
-	[defines.events.on_player_created] = on_player_created,
-	[defines.events.on_player_respawned] = on_player_respawned,
-	--[defines.events.on_cutscene_waypoint_reached] = on_cutscene_waypoint_reached,
-	--["crash-site-skip-cutscene"] = skip_crash_site_cutscene,
-	--[defines.events.on_player_display_resolution_changed] = on_player_display_refresh,
-	--[defines.events.on_player_display_scale_changed] = on_player_display_refresh,
-	--[defines.events.on_cutscene_cancelled] = on_cutscene_cancelled,
-	[defines.events.on_research_finished] = on_research_finished,
-	--[defines.events.on_unit_group_finished_gathering] = on_unit_group_finished_gathering,
-	[defines.events.on_pre_surface_cleared] = on_pre_surface_cleared,
-	[defines.events.on_surface_cleared] = on_surface_cleared,
-	[defines.events.on_console_command] = on_console_command,
-	[defines.events.on_player_toggled_map_editor] = on_player_toggled_map_editor,
-	[defines.events.on_research_cancelled] = on_research_cancelled,
-	[defines.events.on_research_started] = on_research_started,
-}
+
 
 
 freeplay.on_configuration_changed = function()

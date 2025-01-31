@@ -51,6 +51,7 @@ function admin.on_player_cursor_stack_changed(event)
     -- Check if the player was holding the custom deconstruction planner
     if storage.player_holding_custom_planner[player.index] then
         local cursor_stack = player.cursor_stack
+        if(cursor_stack == nil) then return end
 
         -- If the player is no longer holding the custom deconstruction planner
         if not cursor_stack.valid_for_read or cursor_stack.name ~= "deconstruction-planner" then
@@ -232,7 +233,7 @@ function admin.on_player_deconstructed_area(event)
     -- Check if the player is holding the custom deconstruction planner (for landfill removal)
     if storage.player_holding_custom_planner[player.index] then
         local cursor_stack = player.cursor_stack
-
+        if(cursor_stack == nil) then return end
         -- Check if the cursor stack contains the custom deconstruction planner (identified by its tile filter)
         if cursor_stack.valid_for_read and cursor_stack.is_deconstruction_item then
             if cursor_stack.tile_filters and cursor_stack.tile_filters[1] == "landfill" then

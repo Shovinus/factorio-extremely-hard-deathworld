@@ -479,8 +479,8 @@ e.on(e.s.on_entity_damaged, function(event)
             local reduced_damage = original_damage - damage
             --reduce resistance
             local adjusted_damage = damage + (reduced_damage / 2)
-            --20x dmg
-            local increased_damage = adjusted_damage * 20
+            --4x dmg
+            local increased_damage = adjusted_damage * 4
 
             --reset health to previous value
             event.entity.health = event.entity.health + event.final_damage_amount
