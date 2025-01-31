@@ -24,7 +24,7 @@ storage.biter_target_hp_multiplier = 300
 storage.biter_target_hp = storage.biter_target_hp_multiplier * storage.biter_initial_hp
 storage.biter_hp_base_modifier = 0.002
 storage.newgame = true
-storage.extremely_hard_victory = false
+
 storage.reset_seed = 2013392874
 storage.reset_seed_delayed = 2013392874
 storage.restart = "false"
@@ -33,12 +33,12 @@ storage.current_pathfinding = nil
 
 
 local resetVariables = function()
+	game.player.force.technologies["atomic-bomb"].enabled = false
 	storage.player_state = {}
 	storage.deconstruction_history = {}
 	storage.new_map = true
 	-- clear globals
-	storage.extremely_hard_victory = false
-	storage.latch = 0
+	storage.latch= 0
 	storage.u = {}
 	for i = 1, spitter_death_records do
 		storage.u[i] = { 0, 0 }
@@ -47,7 +47,14 @@ local resetVariables = function()
 	storage.deconstruction_history = {}
 	storage.no_regen_biters = {}
 	storage.current_pathfinding = nil
-
+	storage.exhd_game_progress = {
+		nauvis_launch = false,
+		gleba_touchdown = false,
+		vulcanus_touchdown = false,
+		fulgora_touchdown = false,
+		aquilo_touchdown = false,
+		space_edge_reach = false
+	}
 
 	storage.motion = nil
 	-- default starting map settings
@@ -68,7 +75,7 @@ local resetVariables = function()
 	game.map_settings.pollution.ageing                                                = 0.5
 	game.map_settings.pollution.enabled                                               = true
 	game.map_settings.unit_group.max_gathering_unit_groups                            = 30
-	game.map_settings.unit_group.max_unit_group_size                                  = 150
+	game.map_settings.unit_group.max_unit_group_size                                  = 100
 
 	-- path finding changes to reduce lag
 	game.map_settings.path_finder.general_entity_collision_penalty                    = 0
@@ -193,7 +200,6 @@ local reset_global_settings__post_surface_clear = function()
 		surface.freeze_daytime = false
 	end
 	game.forces["enemy"].friendly_fire = false
-	--game.forces["player"].research_queue_enabled = true
 	game.forces["player"].max_failed_attempts_per_tick_per_construction_queue = 2
 	game.forces["player"].max_successful_attempts_per_tick_per_construction_queue = 6
 	game.difficulty_settings.technology_price_multiplier = 1
@@ -229,6 +235,7 @@ end
 
 local on_player_created = function(event)
 	local player = game.get_player(event.player_index)
+	if(player == nil) then return end
 	local name = player.name
 	local x = { ID = (event.player_index - 1), Name = name }
 
@@ -266,14 +273,15 @@ function reset(reason)
 		helpers.write_file("reset/reset.log", "restart", false, 0)
 	else
 		if (red > 0) then
-			local victory = storage.extremely_hard_victory
+			local victory = storage.exhd_game_progress.nauvis_launch
 			local deaths = game.forces["player"].get_kill_count_statistics(1).get_output_count "character"
-			local minutes = math.floor((game.ticks_played / 3600) * 10) / 10
+			local minutes = math.floor((game.tick / 3600) * 10) / 10
 			local mode = storage.hard_mode and "hard" or "normal"
 			local rockets_launched = game.forces["player"].rockets_launched
 
-			local log_message = string.format("%d_%s_%s_%d_%d_%d_%d", storage.reset_seed_delayed, mode, tostring(victory),
-				red, deaths, minutes, rockets_launched)
+			local log_message = string.format("%d_%s_%s_%d_%d_%d_%d", 
+			storage.reset_seed_delayed,
+			mode,tostring(victory),red, deaths, minutes, rockets_launched)
 
 			helpers.write_file("reset/reset.log", log_message, false, 0)
 		end
@@ -344,6 +352,7 @@ local on_player_toggled_map_editor = function(event)
 	storage.restart = "true"
 
 	local player = game.get_player(event.player_index)
+	if(player == nil) then return end
 	reset(string.format("%s has toggled the map editor.", player.name))
 end
 ------------------------------------------------------------------------------------------
@@ -368,17 +377,19 @@ end
 
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------
-local on_rocket_launched = function(event)
-	if storage.extremely_hard_victory == false then
+e.on(defines.events.on_rocket_launched, function(event)
+	if 	storage.exhd_game_progress.nauvis_launch == false then
+		game.print("The rocket has launched! Well done! The nightmare isn't over yet though get to the edge of space, engineer.")
 		game.forces["enemy"].kill_all_units()
 		game.surfaces[1].clear_pollution()
-		game.map_settings.pollution.enabled = false
-		storage.extremely_hard_victory = true
-		game.set_game_state { game_finished = true, player_won = true, can_continue = true, victorious_force = player }
+		game.map_settings.pollution.enemy_attack_pollution_consumption_modifier= 0.5
+		--game.map_settings.pollution.enabled = false
+		storage.exhd_game_progress.nauvis_launch = true
+		--game.set_game_state { game_finished = true, player_won = true, can_continue = true, victorious_force = player }
 	end
-end
+end)
 -------------------------------------------------------------------------------------------------------------------------------------------
-local on_research_finished = function(event)
+e.on(defines.events.on_research_finished,function(event)
 	game.difficulty_settings.technology_price_multiplier = 1
 	game.surfaces[1].solar_power_multiplier = ((game.forces["player"].mining_drill_productivity_bonus * 10) + 1)
 	-----------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -423,7 +434,7 @@ local on_research_finished = function(event)
 		game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
 	end
 	---------------------------------------------------------------------------------------------------------
-	if (event.research.name == "refined-flammables-1") then
+	if (event.research.name == "refined-flammable") then
 		game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.79)
 	end
 	if (event.research.name == "refined-flammables-2") then
@@ -462,7 +473,7 @@ local on_research_finished = function(event)
 		game.forces["player"].worker_robots_speed_modifier = 12
 		game.forces["player"].worker_robots_battery_modifier = 6
 	end
-end
+end)
 -------------------------------------------------------------------------------------------
 local on_research_cancelled = function(event)
 	if event.research[storage.research] == 1 then
@@ -478,9 +489,9 @@ local on_research_started = function(event)
 	if (event.research.name == "spidertron") then
 		game.difficulty_settings.technology_price_multiplier = 0.16
 	end
-	-- Make atomic bomb research 10 times more expensive
+	-- cancel atomic bomb research
 	if (event.research.name == "atomic-bomb") then
-		game.difficulty_settings.technology_price_multiplier = 10
+		game.forces["player"].cancel_current_research()		
 	end
 	if (event.research.name == "artillery") then
 		game.difficulty_settings.technology_price_multiplier = 0.2
@@ -494,7 +505,7 @@ local on_research_started = function(event)
 	if (event.research.name == "rocket-silo") then
 		game.difficulty_settings.technology_price_multiplier = 0.5
 	end
-end
+end	
 -------------------------------------------------------------------------------------------
 -- local on_cutscene_waypoint_reached = function(event)
 -- 	if not storage.crash_site_cutscene_active then return end
@@ -614,14 +625,12 @@ freeplay.events =
 	--[defines.events.on_cutscene_cancelled] = on_cutscene_cancelled,
 	[defines.events.on_research_finished] = on_research_finished,
 	--[defines.events.on_unit_group_finished_gathering] = on_unit_group_finished_gathering,
-	[defines.events.on_rocket_launched] = on_rocket_launched,
 	[defines.events.on_pre_surface_cleared] = on_pre_surface_cleared,
 	[defines.events.on_surface_cleared] = on_surface_cleared,
 	[defines.events.on_console_command] = on_console_command,
 	[defines.events.on_player_toggled_map_editor] = on_player_toggled_map_editor,
 	[defines.events.on_research_cancelled] = on_research_cancelled,
 	[defines.events.on_research_started] = on_research_started,
-	[defines.events.on_script_path_request_finished] = on_script_path_request_finished,
 }
 
 

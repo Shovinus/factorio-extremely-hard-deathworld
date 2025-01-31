@@ -24,7 +24,7 @@
     "copper-ore": {"frequency": 3, "size": 10,"richness": 1},
     "iron-ore": {"frequency": 5, "size": 12, "richness": 1},
     "uranium-ore": {"frequency": 3, "size": 1, "richness": 1},
-    "crude-oil": {"frequency": 10, "size": 10, "richness": 0.2},
+    "crude-oil": {"frequency": 10, "size": 10, "richness": 1},
     "trees": {"frequency": 1, "size": 1, "richness": 1},
     "enemy-base": {"frequency": 1, "size": 6, "richness": 1}
   },
