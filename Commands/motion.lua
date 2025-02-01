@@ -103,13 +103,13 @@ function motioner.on_gui_click(event)
         event.element.name == "submit_motion_button" then
         local frame = event.element.parent
         -- Evaluate whether a motion can be submitted;
-        if game.ticks_played > motion_max_time then
+        if storage.time > motion_max_time then
             player.print("You cannot submit a motion after the game is 10 minutes old.")
             frame.destroy()
             return
         end
-        if (storage.motion and storage.motion.started + motion_vote_time > game.ticks_played) then
-            local seconds_left = math.ceil(((storage.motion.started + motion_vote_time) - game.ticks_played) / 60)
+        if (storage.motion and storage.motion.started + motion_vote_time > storage.time) then
+            local seconds_left = math.ceil(((storage.motion.started + motion_vote_time) - storage.time) / 60)
             if (storage.motion.started + motion_vote_time > motion_max_time) then
                 player.print("You cannot submit a motion after the game is 10 minutes old.")
                 frame.destroy()
@@ -132,7 +132,6 @@ function motioner.on_gui_click(event)
         storage.motion = {
             seed = seed,
             hard_mode = hardmode,
-            started = game.ticks_played,
             votes = {}
         }
         if( #game.connected_players < 3) then
@@ -157,7 +156,7 @@ function motioner.on_gui_click(event)
         if player.gui.top.top_panel.vote_panel then
             player.gui.top.top_panel.vote_panel.destroy()
         end
-        if (storage.motion == nil or storage.motion.started + motion_vote_time < game.ticks_played) then
+        if (storage.motion == nil or storage.motion.started + motion_vote_time < storage.time) then
             player.print("The vote has ended.")
             return
         end
@@ -181,7 +180,7 @@ function motioner.on_gui_click(event)
         if player.gui.top.top_panel.vote_panel then
             player.gui.top.top_panel.vote_panel.destroy()
         end
-        if (storage.motion == nil or (storage.motion.started + motion_vote_time < game.ticks_played)) then
+        if (storage.motion == nil or (storage.motion.started + motion_vote_time < storage.time)) then
             player.print("The vote has ended.")
             return
         end

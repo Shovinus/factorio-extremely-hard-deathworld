@@ -4,6 +4,22 @@ local g = require("utils.general")
 spitter_death_records = 20
 max_path_deviation = 300
 enemy_check_offset = 1
+qualities_map = { "normal", "uncommon", "rare", "epic", "legendary" }
+    
+-- Weight table based on the evolution factor (0 to 1)
+weight_table = {
+    {100,  0,  0,  0,  0},  -- 0.0
+    { 90, 10,  0,  0,  0},  -- 0.1
+    { 70, 30,  0,  0,  0},  -- 0.2
+    { 30, 50, 20,  0,  0},  -- 0.3
+    {  0, 70, 30,  0,  0},  -- 0.4
+    {  0, 50, 40, 10,  0},  -- 0.5
+    {  0, 30, 60, 10,  0},  -- 0.6
+    {  0, 20, 50, 30,  0},  -- 0.7
+    {  0,  0, 40, 50, 10},  -- 0.8
+    {  0,  0, 20, 60, 20},  -- 0.9
+    {  0,  0, 10, 20, 80}   -- 1.0
+}
 
 function increase_biter_hp()
     local hp = storage.biter_hp
@@ -268,42 +284,58 @@ function send_group_to_spawn(group)
 end
 
 function get_quality()
-    -- Assuming qualities_map is sorted from lowest to highest quality.
-    local qualities_map = { "normal", "uncommon", "rare", "epic", "legendary"}
-    
-    local weights = {}
-    local total_weight = 0
-    local evolution = game.forces["enemy"].get_evolution_factor(1)
-    
-    -- If evolution > 0.5, invert the evolution calculation
-    local adjusted_evolution = evolution / 1.5
-    if evolution > 0.5 then
-        adjusted_evolution = 1 - evolution
-    end
-    adjusted_evolution = math.min(adjusted_evolution * 2, 1)
+    local qualities_map = { "normal", "uncommon", "rare", "epic", "legendary" }
 
-    -- Generate weights based on evolution
-    for i = 1, #qualities_map do
-        local weight = math.pow(adjusted_evolution, i) * 100
-        table.insert(weights, weight)
+    -- Weight table based on evolution factor (0 to 1)
+    local weight_table = {
+        {100,  0,  0,  0,  0},  -- 0.0
+        { 90, 10,  0,  0,  0},  -- 0.1
+        { 70, 30,  0,  0,  0},  -- 0.2
+        { 30, 50, 20,  0,  0},  -- 0.3
+        {  0, 70, 30,  0,  0},  -- 0.4
+        {  0, 50, 40, 10,  0},  -- 0.5
+        {  0, 30, 60, 10,  0},  -- 0.6
+        {  0, 20, 50, 30,  0},  -- 0.7
+        {  0,  0, 40, 50, 10},  -- 0.8
+        {  0,  0, 20, 60, 20},  -- 0.9
+        {  0,  0, 10, 20, 80}   -- 1.0
+    }
+
+    -- Get the evolution factor
+    local evolution = game.forces["enemy"].get_evolution_factor()
+    local evolution_index = evolution * 10  -- Convert 0-1 range to 0-10 range
+    local lower_index = math.floor(evolution_index) + 1  -- Floor and convert to 1-based index
+    local upper_index = math.min(lower_index + 1, #weight_table)  -- Ensure it's within bounds
+    local interp_factor = evolution_index % 1  -- Fractional part for interpolation
+
+    -- Ensure lower_index is within bounds
+    lower_index = math.max(1, math.min(lower_index, #weight_table))
+
+    -- Get the two closest weight distributions
+    local lower_weights = weight_table[lower_index]
+    local upper_weights = weight_table[upper_index]
+
+    -- Interpolate between the two weight distributions
+    local interpolated_weights = {}
+    local total_weight = 0
+    for i = 1, #lower_weights do
+        local weight = lower_weights[i] * (1 - interp_factor) + upper_weights[i] * interp_factor
+        table.insert(interpolated_weights, weight)
         total_weight = total_weight + weight
     end
 
-    -- Perform a weighted random selection
+    -- Perform weighted random selection
     local random_value = math.random() * total_weight
     local cumulative_weight = 0
 
-    for i, weight in ipairs(weights) do
+    for i, weight in ipairs(interpolated_weights) do
         cumulative_weight = cumulative_weight + weight
         if random_value <= cumulative_weight then
-            -- If evolution > 0.5, invert the quality selection
-            if evolution > 0.5 then
-                return prototypes.quality[qualities_map[#qualities_map - i + 1]]
-            end
             return prototypes.quality[qualities_map[i]]
         end
     end
 end
+
 e.nth_tick(6, function()
     local _enemies = game.surfaces[1].find_entities_filtered{ type = "unit", force = "enemy" }    
     enemy_check_offset = enemy_check_offset + 1
@@ -337,7 +369,7 @@ e.nth_tick(60 * 60, function()
     ---------------------------------------
     local evo = game.forces["enemy"].get_evolution_factor(1)
     local kills = enemies.getBiterKills()
-    local ticks = game.ticks_played
+    local ticks = storage.time
     local pollution = game.get_pollution_statistics(1).get_flow_count {
         category = "output",
         name = "biter-spawner",
@@ -510,12 +542,12 @@ e.on(e.s.on_build_base_arrived, function(event)
                 local retries = 0
                 local unit = members[i]
                 --confirm in the conversion map
-                if spitter_to_worm_conversion_map[unit.name] and converted_units < (game.ticks_played / (3600 * 2)) then
+                if spitter_to_worm_conversion_map[unit.name] and converted_units < (storage.time / (3600 * 30)) then
                     converted_units = converted_units + 1
                     -- attempt to place the worm within the radius`
                     local new_pos = g.add_random_offset(15, unit.position)
                     surface.create_entity { name = spitter_to_worm_conversion_map[unit.name],
-                        position = new_pos, force = unit.force }
+                        position = new_pos, force = unit.force, quality = unit.quality }
                 end
                 unit.destroy()
             end

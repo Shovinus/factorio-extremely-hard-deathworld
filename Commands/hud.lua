@@ -31,7 +31,10 @@ function hud.create_top_left_gui(player)
 
     local biter_hp = storage.biter_hp;
     -- convert ticks to friendly time
-    local ticks = game.ticks_played
+    local ticks = storage.time
+    if(ticks == nil) then
+        ticks = 0
+    end
     local seconds = ticks / 60
     local minutes = seconds / 60
     local hours = minutes / 60

@@ -24,6 +24,7 @@ storage.biter_target_hp_multiplier = 300
 storage.biter_target_hp = storage.biter_target_hp_multiplier * storage.biter_initial_hp
 storage.biter_hp_base_modifier = 0.002
 storage.newgame = true
+storage.time = 0
 
 storage.reset_seed = 2013392874
 storage.reset_seed_delayed = 2013392874
@@ -33,12 +34,15 @@ storage.current_pathfinding = nil
 
 
 local resetVariables = function()
-	game.player.force.technologies["atomic-bomb"].enabled = false
+	game.forces["player"].technologies["atomic-bomb"].enabled = false
+
+
+
 	storage.player_state = {}
 	storage.deconstruction_history = {}
 	storage.new_map = true
 	-- clear globals
-	storage.latch= 0
+	storage.latch = 0
 	storage.u = {}
 	for i = 1, spitter_death_records do
 		storage.u[i] = { 0, 0 }
@@ -55,7 +59,7 @@ local resetVariables = function()
 		aquilo_touchdown = false,
 		space_edge_reach = false
 	}
-
+	storage.time = 0
 	storage.motion = nil
 	-- default starting map settings
 	game.map_settings.enemy_evolution.destroy_factor = 0
@@ -207,12 +211,27 @@ local reset_global_settings__post_surface_clear = function()
 	game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.8)
 	game.forces["player"].set_turret_attack_modifier("laser-turret", 1.35)
 	game.forces["player"].set_gun_speed_modifier("laser", 4)
+	
 end
 
-local reset_global_settings = function()
+local reset_global_settings = function()	
 	reset_global_setings__pre_surface_clear()
 	reset_global_settings__post_surface_clear()
 end
+
+e.on(defines.events.on_surface_created, function(event)
+	local surface = game.surfaces[event.surface_index]
+	if surface.name == "vulcanus" then		
+		storage.exhd_game_progress.vulcanus_touchdown = true
+	elseif surface.name == "gleba" then
+		storage.exhd_game_progress.gleba_touchdown = true
+	elseif surface.name == "fulgora" then
+		storage.exhd_game_progress.fulgora_touchdown = true
+	elseif surface.name == "aquilo" then
+		storage.exhd_game_progress.aquilo_touchdown = true
+	end
+end)
+
 
 local handle_player_created_or_respawned = function(player_index)
 	if (storage.player_state == nil) then
@@ -233,9 +252,9 @@ local handle_player_created_or_respawned = function(player_index)
 	end
 end
 
-e.on(defines.events.on_player_created,function(event)
+e.on(defines.events.on_player_created, function(event)
 	local player = game.get_player(event.player_index)
-	if(player == nil) then return end
+	if (player == nil) then return end
 	local name = player.name
 	local x = { ID = (event.player_index - 1), Name = name }
 
@@ -279,15 +298,21 @@ function reset(reason)
 			local mode = storage.hard_mode and "hard" or "normal"
 			local rockets_launched = game.forces["player"].rockets_launched
 
-			local log_message = string.format("%d_%s_%s_%d_%d_%d_%d", 
-			storage.reset_seed_delayed,
-			mode,tostring(victory),red, deaths, minutes, rockets_launched)
+			local log_message = string.format("%d_%s_%s_%d_%d_%d_%d",
+				storage.reset_seed_delayed,
+				mode, tostring(victory), red, deaths, minutes, rockets_launched)
 
 			helpers.write_file("reset/reset.log", log_message, false, 0)
 		end
 		reset_type = "[color=green][font=default-large-bold]Soft reset[/font][/color]"
 		change_seed()
-		game.surfaces[1].clear(true)
+		--clear all surfaces
+		for _, surface in pairs(game.surfaces) do
+			surface.clear(true)
+		end
+		--set the map_settings
+		reset_global_settings()
+
 		game.forces["player"].reset()
 		for _, pl in pairs(game.players) do
 			if pl and pl.valid and pl.character and pl.character.health > 0 then
@@ -331,11 +356,11 @@ end
 -- end
 
 -----------------------------------------------------------------------------------------------
-e.on(defines.events.on_pre_surface_cleared,function(event)
+e.on(defines.events.on_pre_surface_cleared, function(event)
 	reset_global_setings__pre_surface_clear()
 end)
 -----------------------------------------------------------------------------------------------
-e.on(defines.events.on_surface_cleared,function(event)
+e.on(defines.events.on_surface_cleared, function(event)
 	reset_global_settings__post_surface_clear()
 
 	local surface = game.surfaces[1]
@@ -345,18 +370,18 @@ e.on(defines.events.on_surface_cleared,function(event)
 		util.copy(storage.crashed_debris_items), util.copy(storage.crashed_ship_parts))
 end)
 ------------------------------------------------------------------------------------------
-e.on(defines.events.on_player_toggled_map_editor,function(event)
+e.on(defines.events.on_player_toggled_map_editor, function(event)
 	if (is_debug()) then
 		return
 	end
 	storage.restart = "true"
 
 	local player = game.get_player(event.player_index)
-	if(player == nil) then return end
+	if (player == nil) then return end
 	reset(string.format("%s has toggled the map editor.", player.name))
 end)
 ------------------------------------------------------------------------------------------
-e.on(defines.events.on_console_command,function(event)
+e.on(defines.events.on_console_command, function(event)
 	local command = event.command
 	local parameters = event.parameters
 	print(command)
@@ -378,18 +403,19 @@ end)
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 e.on(defines.events.on_rocket_launched, function(event)
-	if 	storage.exhd_game_progress.nauvis_launch == false then
-		game.print("The rocket has launched! Well done! The nightmare isn't over yet though get to the edge of space, engineer.")
+	if storage.exhd_game_progress.nauvis_launch == false then
+		game.print(
+		"The rocket has launched! Well done! The nightmare isn't over yet though get to the edge of space, engineer.")
 		game.forces["enemy"].kill_all_units()
 		game.surfaces[1].clear_pollution()
-		game.map_settings.pollution.enemy_attack_pollution_consumption_modifier= 0.5
+		game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = 0.5
 		--game.map_settings.pollution.enabled = false
 		storage.exhd_game_progress.nauvis_launch = true
 		--game.set_game_state { game_finished = true, player_won = true, can_continue = true, victorious_force = player }
 	end
 end)
 -------------------------------------------------------------------------------------------------------------------------------------------
-e.on(defines.events.on_research_finished,function(event)
+e.on(defines.events.on_research_finished, function(event)
 	game.difficulty_settings.technology_price_multiplier = 1
 	game.surfaces[1].solar_power_multiplier = ((game.forces["player"].mining_drill_productivity_bonus * 10) + 1)
 	-----------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -475,13 +501,13 @@ e.on(defines.events.on_research_finished,function(event)
 	end
 end)
 -------------------------------------------------------------------------------------------
-e.on(defines.events.on_research_cancelled,function(event)
+e.on(defines.events.on_research_cancelled, function(event)
 	if event.research[storage.research] == 1 then
 		game.difficulty_settings.technology_price_multiplier = 1
 	end
 end)
 -------------------------------------------------------------------------------------------
-e.on(defines.events.on_research_started,function(event)
+e.on(defines.events.on_research_started, function(event)
 	storage.research = event.research.name
 	if (event.research.name == "nuclear-power") then
 		game.difficulty_settings.technology_price_multiplier = 0.5
@@ -638,7 +664,7 @@ freeplay.on_init = function()
 end
 e.nth_tick(60, function()
 	if storage.new_map then
-		if game.ticks_played > 100 then
+		if storage.time > 100 then
 			storage.new_map = false
 			storage.reset_seed_delayed = storage.reset_seed
 			game.forces["player"].chart(game.surfaces[1], { { x = -400, y = -400 }, { x = 400, y = 400 } })
@@ -652,9 +678,16 @@ e.nth_tick(60 * 60, function()
 	local tpd = ((evo + 1) * 25000)
 	game.surfaces[1].ticks_per_day = tpd
 	-- reset the game if it has been running for more than 7 days
-	if game.ticks_played > 36288000 then
+	if storage.time > 36288000 then
 		reset("Game has reached its maximum playtime of 7 days.")
 	end
 end)
+e.nth_tick(1, function()
+	if(storage.time == nil) then
+		storage.time = 0
+	end
+	storage.time =storage.time + 1
+end)
+
 
 return freeplay

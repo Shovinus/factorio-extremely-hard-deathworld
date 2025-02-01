@@ -24,12 +24,13 @@ end
 
 -- Register runtime event
 function event.on(eventType, registerFunction, filter)
-    if eventWatchers[eventType] == nil then
-        eventWatchers[eventType] = { handlers = {}, filter = nil }
+    local eventTypeSTR = "_"..eventType
+    if eventWatchers[eventTypeSTR] == nil then
+        eventWatchers[eventTypeSTR] = { handlers = {}, filter = nil }
     end
 
     -- Add the handler and its filter
-    table.insert(eventWatchers[eventType].handlers, { handler = registerFunction, filter = filter })
+    table.insert(eventWatchers[eventTypeSTR].handlers, { handler = registerFunction, filter = filter })
 
     -- Check and update the unified filter
     event.update_filter(eventType)
@@ -37,7 +38,8 @@ end
 
 -- Update the unified filter for a given event type
 function event.update_filter(eventType)
-    local watchers = eventWatchers[eventType]
+    local eventTypeSTR = "_"..eventType
+    local watchers = eventWatchers[eventTypeSTR]
     if not watchers then return end
 
     -- Build the combined filter
@@ -65,7 +67,8 @@ end
 
 -- Unified runtime event handler
 function runtime_event_handler(event)
-    local watchers = eventWatchers[event.name]
+    local eventType = "_"..event.name
+    local watchers = eventWatchers[eventType]
     if not watchers then return end
 
     for _, watcher in ipairs(watchers.handlers) do
