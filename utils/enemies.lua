@@ -3,7 +3,7 @@ local e = require("utils.event")
 local g = require("utils.general")
 spitter_death_records = 20
 max_path_deviation = 300
-enemy_check_offset = 1
+storage.enemy_check_offset = 1
 qualities_map = { "normal", "uncommon", "rare", "epic", "legendary" }
     
 -- Weight table based on the evolution factor (0 to 1)
@@ -338,12 +338,12 @@ end
 
 e.nth_tick(6, function()
     local _enemies = game.surfaces[1].find_entities_filtered{ type = "unit", force = "enemy" }    
-    enemy_check_offset = enemy_check_offset + 1
-    if enemy_check_offset > 600 then
-        enemy_check_offset = 1
+    storage.enemy_check_offset = storage.enemy_check_offset + 1
+    if storage.enemy_check_offset > 600 then
+        storage.enemy_check_offset = 1
     end
     -- check every 60th enemy
-    for i = enemy_check_offset, #_enemies, 600 do
+    for i = storage.enemy_check_offset, #_enemies, 600 do
         local enemy = _enemies[i]
         if not enemy.valid or not enemy.commandable or not enemy.commandable.command then
             game.print("Enemy is not commandable")
