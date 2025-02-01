@@ -35,6 +35,9 @@ storage.current_pathfinding = nil
 
 local resetVariables = function()
 	game.forces["player"].technologies["atomic-bomb"].enabled = false
+	game.forces["player"].technologies["electronics"].researched = true
+	game.forces["player"].technologies["steam-power"].researched = true
+	game.forces["player"].technologies["automation-science-pack"].researched = true
 
 
 
