@@ -336,7 +336,7 @@ function get_quality()
             p = #qualities_map
         end
 
-        return prototypes.quality[qualities_map[1]]
+        return prototypes.quality[qualities_map[p]]
     end
 end
 
