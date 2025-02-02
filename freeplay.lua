@@ -73,7 +73,7 @@ local resetVariables = function()
 	--	game.map_settings.enemy_evolution.time_factor = 0.00007
 	--	game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = 0.5
 	--else
-		game.map_settings.enemy_evolution.time_factor = 0.00005
+		game.map_settings.enemy_evolution.time_factor = 0.00000
 		game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = 6
 	--end
 	game.map_settings.enemy_expansion.enabled                                         = true

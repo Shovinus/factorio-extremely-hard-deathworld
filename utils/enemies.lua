@@ -53,6 +53,11 @@ end
 
 
 local function fill_closest_water_tile(start_pos, end_pos, surface)
+    
+    local filltile = "landfill"
+    if(storage.time > 60 * 60 * 60) then
+        filltile = "water-shallow"
+    end
     local x0, y0 = start_pos.x, start_pos.y
     local x1, y1 = end_pos.x, end_pos.y
 
@@ -76,8 +81,7 @@ local function fill_closest_water_tile(start_pos, end_pos, surface)
                 for j = -2, 2 do
                     local tile = surface.get_tile(x0 + i, y0 + j)
                     if tile and tile.valid and tile.prototype.collision_mask.layers["water_tile"] then
-                        --surface.set_tiles({ { name = "water-shallow", position = { x0 + i, y0 + j } } })
-                        surface.set_tiles({ { name = "landfill", position = { x0 + i, y0 + j } } })
+                        surface.set_tiles({ { name = filltile, position = { x0 + i, y0 + j } } })
                     end
                 end
             end
