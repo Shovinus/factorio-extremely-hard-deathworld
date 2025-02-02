@@ -38,7 +38,11 @@ local resetVariables = function()
 	game.forces["player"].technologies["electronics"].researched = true
 	game.forces["player"].technologies["steam-power"].researched = true
 	game.forces["player"].technologies["automation-science-pack"].researched = true
-
+	if storage.hard_mode then		
+		game.forces["player"].manual_mining_speed_modifier = 1
+	else		
+		game.forces["player"].manual_mining_speed_modifier = 10
+	end
 
 
 	storage.player_state = {}
@@ -213,9 +217,9 @@ local reset_global_settings__post_surface_clear = function()
 	game.forces["player"].max_successful_attempts_per_tick_per_construction_queue = 6
 	game.difficulty_settings.technology_price_multiplier = 1
 	surface.solar_power_multiplier = 1
-	game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.8)
-	game.forces["player"].set_turret_attack_modifier("laser-turret", 1.35)
-	game.forces["player"].set_gun_speed_modifier("laser", 4)
+	--game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.8)
+	--game.forces["player"].set_turret_attack_modifier("laser-turret", 1.35)
+	--game.forces["player"].set_gun_speed_modifier("laser", 4)
 	
 end
 
@@ -444,43 +448,43 @@ e.on(defines.events.on_research_finished, function(event)
 		game.forces["player"].set_gun_speed_modifier("laser", 5.6)
 	end
 	------------------------------------------------------------------------------------
-	if (event.research.name == "physical-projectile-damage-1") then
-		game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
-	end
-	if (event.research.name == "physical-projectile-damage-2") then
-		game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
-	end
-	if (event.research.name == "physical-projectile-damage-3") then
-		game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
-	end
-	if (event.research.name == "physical-projectile-damage-4") then
-		game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
-	end
-	if (event.research.name == "physical-projectile-damage-5") then
-		game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
-	end
-	if (event.research.name == "physical-projectile-damage-6") then
-		game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
-	end
+	-- if (event.research.name == "physical-projectile-damage-1") then
+	-- 	game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
+	-- end 
+	-- if (event.research.name == "physical-projectile-damage-2") then
+	-- 	game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
+	-- end
+	-- if (event.research.name == "physical-projectile-damage-3") then
+	-- 	game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
+	-- end
+	-- if (event.research.name == "physical-projectile-damage-4") then
+	-- 	game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
+	-- end
+	-- if (event.research.name == "physical-projectile-damage-5") then
+	-- 	game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
+	-- end
+	-- if (event.research.name == "physical-projectile-damage-6") then
+	-- 	game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
+	-- end
 	---------------------------------------------------------------------------------------------------------
-	if (event.research.name == "refined-flammable") then
-		game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.79)
-	end
-	if (event.research.name == "refined-flammables-2") then
-		game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.78)
-	end
-	if (event.research.name == "refined-flammables-3") then
-		game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.76)
-	end
-	if (event.research.name == "refined-flammables-4") then
-		game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.73)
-	end
-	if (event.research.name == "refined-flammables-5") then
-		game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.7)
-	end
-	if (event.research.name == "refined-flammables-6") then
-		game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.65)
-	end
+	-- if (event.research.name == "refined-flammable") then
+	-- 	game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.79)
+	-- end
+	-- if (event.research.name == "refined-flammables-2") then
+	-- 	game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.78)
+	-- end
+	-- if (event.research.name == "refined-flammables-3") then
+	-- 	game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.76)
+	-- end
+	-- if (event.research.name == "refined-flammables-4") then
+	-- 	game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.73)
+	-- end
+	-- if (event.research.name == "refined-flammables-5") then
+	-- 	game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.7)
+	-- end
+	-- if (event.research.name == "refined-flammables-6") then
+	-- 	game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.65)
+	-- end
 	--------------------------------------------------------------------------------------------
 	if (event.research.name == "worker-robots-speed-1") then
 		game.forces["player"].worker_robots_speed_modifier = 1
