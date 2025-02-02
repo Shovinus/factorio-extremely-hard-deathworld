@@ -60,20 +60,22 @@ local resetVariables = function()
 		vulcanus_touchdown = false,
 		fulgora_touchdown = false,
 		aquilo_touchdown = false,
-		space_edge_reach = false
+		space_edge_reach = false,
+		planets_touched = 0
 	}
 	storage.time = 0
 	storage.motion = nil
 	-- default starting map settings
 	game.map_settings.enemy_evolution.destroy_factor = 0
 	game.map_settings.enemy_evolution.pollution_factor = 0
-	if storage.hard_mode then
-		game.map_settings.enemy_evolution.time_factor = 0.00007
-		game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = 0.5
-	else
+
+	--if storage.hard_mode then
+	--	game.map_settings.enemy_evolution.time_factor = 0.00007
+	--	game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = 0.5
+	--else
 		game.map_settings.enemy_evolution.time_factor = 0.00005
 		game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = 6
-	end
+	--end
 	game.map_settings.enemy_expansion.enabled                                         = true
 	game.map_settings.enemy_expansion.max_expansion_cooldown                          = 4000
 	game.map_settings.enemy_expansion.min_expansion_cooldown                          = 3000
@@ -224,13 +226,17 @@ end
 
 e.on(defines.events.on_surface_created, function(event)
 	local surface = game.surfaces[event.surface_index]
-	if surface.name == "vulcanus" then		
+	if surface.name == "vulcanus" then
+		storage.exhd_game_progress.planets_touched = storage.exhd_game_progress.planets_touched + 1
 		storage.exhd_game_progress.vulcanus_touchdown = true
 	elseif surface.name == "gleba" then
+		storage.exhd_game_progress.planets_touched = storage.exhd_game_progress.planets_touched + 1
 		storage.exhd_game_progress.gleba_touchdown = true
 	elseif surface.name == "fulgora" then
+		storage.exhd_game_progress.planets_touched = storage.exhd_game_progress.planets_touched + 1
 		storage.exhd_game_progress.fulgora_touchdown = true
 	elseif surface.name == "aquilo" then
+		storage.exhd_game_progress.planets_touched = storage.exhd_game_progress.planets_touched + 1
 		storage.exhd_game_progress.aquilo_touchdown = true
 	end
 end)
@@ -400,21 +406,15 @@ e.on(defines.events.on_console_command, function(event)
 	end
 end)
 
-
-
-
-
 ---------------------------------------------------------------------------------------------------------------------------------------------------
-e.on(defines.events.on_rocket_launched, function(event)
+e.on(defines.events.on_cargo_pod_finished_ascending, function(event)
 	if storage.exhd_game_progress.nauvis_launch == false then
 		game.print(
-		"The rocket has launched! Well done! The nightmare isn't over yet though get to the edge of space, engineer.")
+		"The rocket has launched! Well done! The nightmare isn't over yet though, get to the edge of space, engineer.")
 		game.forces["enemy"].kill_all_units()
 		game.surfaces[1].clear_pollution()
 		game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = 0.5
-		--game.map_settings.pollution.enabled = false
 		storage.exhd_game_progress.nauvis_launch = true
-		--game.set_game_state { game_finished = true, player_won = true, can_continue = true, victorious_force = player }
 	end
 end)
 -------------------------------------------------------------------------------------------------------------------------------------------

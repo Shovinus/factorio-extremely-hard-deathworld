@@ -1,24 +1,25 @@
 enemies = {}
 local e = require("utils.event")
 local g = require("utils.general")
+local time_til_100_evo = 7 * 60 * 60 * 60 -- 7 hours
 spitter_death_records = 20
 max_path_deviation = 300
 storage.enemy_check_offset = 1
 qualities_map = { "normal", "uncommon", "rare", "epic", "legendary" }
-    
+
 -- Weight table based on the evolution factor (0 to 1)
 weight_table = {
-    {100,  0,  0,  0,  0},  -- 0.0
-    { 90, 10,  0,  0,  0},  -- 0.1
-    { 70, 30,  0,  0,  0},  -- 0.2
-    { 30, 50, 20,  0,  0},  -- 0.3
-    {  0, 70, 30,  0,  0},  -- 0.4
-    {  0, 50, 40, 10,  0},  -- 0.5
-    {  0, 30, 60, 10,  0},  -- 0.6
-    {  0, 20, 50, 30,  0},  -- 0.7
-    {  0,  0, 40, 50, 10},  -- 0.8
-    {  0,  0, 20, 60, 20},  -- 0.9
-    {  0,  0, 10, 20, 80}   -- 1.0
+    { 100, 0,  0,  0,  0 },  -- 0.0
+    { 90,  10, 0,  0,  0 },  -- 0.1
+    { 70,  30, 0,  0,  0 },  -- 0.2
+    { 30,  50, 20, 0,  0 },  -- 0.3
+    { 0,   70, 30, 0,  0 },  -- 0.4
+    { 0,   50, 40, 10, 0 },  -- 0.5
+    { 0,   30, 60, 10, 0 },  -- 0.6
+    { 0,   20, 50, 30, 0 },  -- 0.7
+    { 0,   0,  40, 50, 10 }, -- 0.8
+    { 0,   0,  20, 60, 20 }, -- 0.9
+    { 0,   0,  10, 20, 80 }  -- 1.0
 }
 
 function increase_biter_hp()
@@ -177,7 +178,7 @@ e.on(e.s.on_script_path_request_finished, function(event)
     elseif event.path ~= nil then
         local path = event.path
 
-        local _end = {x=0, y=0}
+        local _end = { x = 0, y = 0 }
         -- Iterate over every 32th node to reduce processing overhead
         for i = 1, #path, 32 do
             local node = path[i].position
@@ -230,6 +231,7 @@ e.on(e.s.on_unit_group_finished_gathering, function(event)
         send_group_to_spitter_death(new_group)
     end
 end)
+
 enemies.getBiterKills = function()
     local killStats = game.forces["player"].get_kill_count_statistics(1)
     local kills = 0
@@ -260,7 +262,7 @@ function send_group_to_spawn(group)
             goal = { x = 0, y = 0 },
             force = sample_entity.force,
             radius = 1, -- Define the clearance around obstacles
-      
+
         })
         storage.current_pathfinding              = {}
         storage.current_pathfinding[pathrequest] = sample_entity.position
@@ -274,7 +276,7 @@ function send_group_to_spawn(group)
                 type = defines.command.go_to_location,
                 destination = g.add_random_offset(64, { 0, 0 }),
                 distraction = defines.distraction.by_anything,
-                
+
             },
             { type = defines.command.wander,     radius = 1,                     wander_in_group = true,                 ticks_to_wait = 10,   distraction = defines.distraction.none },
             { type = defines.command.build_base, destination = { x = 0, y = 0 }, distraction = defines.distraction.none, ignore_planner = true }
@@ -285,85 +287,74 @@ end
 
 function get_quality()
     local qualities_map = { "normal", "uncommon", "rare", "epic", "legendary" }
+    if (storage.hard_mode) then
 
-    -- Weight table based on evolution factor (0 to 1)
-    local weight_table = {
-        {100,  0,  0,  0,  0},  -- 0.0
-        { 90, 10,  0,  0,  0},  -- 0.1
-        { 70, 30,  0,  0,  0},  -- 0.2
-        { 30, 50, 20,  0,  0},  -- 0.3
-        {  0, 70, 30,  0,  0},  -- 0.4
-        {  0, 50, 40, 10,  0},  -- 0.5
-        {  0, 30, 60, 10,  0},  -- 0.6
-        {  0, 20, 50, 30,  0},  -- 0.7
-        {  0,  0, 40, 50, 10},  -- 0.8
-        {  0,  0, 20, 60, 20},  -- 0.9
-        {  0,  0, 10, 20, 80}   -- 1.0
-    }
 
-    -- Get the evolution factor
-    local evolution = game.forces["enemy"].get_evolution_factor()
-    local evolution_index = evolution * 10  -- Convert 0-1 range to 0-10 range
-    local lower_index = math.floor(evolution_index) + 1  -- Floor and convert to 1-based index
-    local upper_index = math.min(lower_index + 1, #weight_table)  -- Ensure it's within bounds
-    local interp_factor = evolution_index % 1  -- Fractional part for interpolation
+        -- Get the evolution factor
+        local evolution = game.forces["enemy"].get_evolution_factor()
+        local evolution_index = evolution * 10                       -- Convert 0-1 range to 0-10 range
+        local lower_index = math.floor(evolution_index) + 1          -- Floor and convert to 1-based index
+        local upper_index = math.min(lower_index + 1, #weight_table) -- Ensure it's within bounds
+        local interp_factor = evolution_index % 1                    -- Fractional part for interpolation
 
-    -- Ensure lower_index is within bounds
-    lower_index = math.max(1, math.min(lower_index, #weight_table))
+        -- Ensure lower_index is within bounds
+        lower_index = math.max(1, math.min(lower_index, #weight_table))
 
-    -- Get the two closest weight distributions
-    local lower_weights = weight_table[lower_index]
-    local upper_weights = weight_table[upper_index]
+        -- Get the two closest weight distributions
+        local lower_weights = weight_table[lower_index]
+        local upper_weights = weight_table[upper_index]
 
-    -- Interpolate between the two weight distributions
-    local interpolated_weights = {}
-    local total_weight = 0
-    for i = 1, #lower_weights do
-        local weight = lower_weights[i] * (1 - interp_factor) + upper_weights[i] * interp_factor
-        table.insert(interpolated_weights, weight)
-        total_weight = total_weight + weight
-    end
-
-    -- Perform weighted random selection
-    local random_value = math.random() * total_weight
-    local cumulative_weight = 0
-
-    for i, weight in ipairs(interpolated_weights) do
-        cumulative_weight = cumulative_weight + weight
-        if random_value <= cumulative_weight then
-            return prototypes.quality[qualities_map[i]]
+        -- Interpolate between the two weight distributions
+        local interpolated_weights = {}
+        local total_weight = 0
+        for i = 1, #lower_weights do
+            local weight = lower_weights[i] * (1 - interp_factor) + upper_weights[i] * interp_factor
+            table.insert(interpolated_weights, weight)
+            total_weight = total_weight + weight
         end
+
+        -- Perform weighted random selection
+        local random_value = math.random() * total_weight
+        local cumulative_weight = 0
+
+        for i, weight in ipairs(interpolated_weights) do
+            cumulative_weight = cumulative_weight + weight
+            if random_value <= cumulative_weight then
+                return prototypes.quality[qualities_map[i]]
+            end
+        end
+    else
+        -- make quality based on the number of planets touched
+        p = storage.exhd_game_progress.planets_touched
+        p = p + 1
+        if (p > #qualities_map)
+        then
+            p = #qualities_map
+        end
+
+        return prototypes.quality[qualities_map[1]]
     end
 end
 
-e.nth_tick(6, function()
-    local _enemies = game.surfaces[1].find_entities_filtered{ type = "unit", force = "enemy" }    
-    storage.enemy_check_offset = storage.enemy_check_offset + 1
-    if storage.enemy_check_offset > 600 then
-        storage.enemy_check_offset = 1
-    end
-    -- check every 60th enemy
-    for i = storage.enemy_check_offset, #_enemies, 600 do
-        local enemy = _enemies[i]
-        if not enemy.valid or not enemy.commandable or not enemy.commandable.command then
-            game.print("Enemy is not commandable")
-        else  
-            if(enemy.health == enemy.prototype.get_max_health(enemy.quality) and enemy.quality.level == 0 and enemy.color == nil) then
-                newenemy =game.surfaces[1].create_entity{
-                    name = enemy.name, 
-                    position = enemy.position,
-                     force = "enemy",
-                     direction = enemy.direction,
-                     quality = get_quality(),
-                     color = {r = 0.5, g = 0, b = 0, a = 0.5}
-                    };
-                newenemy.commandable.set_command(enemy.commandable.command)
-                newenemy.color = {r = 0.5, g = 0, b = 0, a = 0.5}
-                enemy.destroy()
-                end
-            end
+e.on(e.s.on_entity_spawned, function(event)
+    local entity = event.entity
+    if entity.force.name == "enemy" then
+        if entity.type == "unit" then
+            newenemy = game.surfaces[1].create_entity {
+                name = entity.name,
+                position = entity.position,
+                force = "enemy",
+                direction = entity.direction,
+                quality = get_quality(),
+                color = { r = 0.5, g = 0, b = 0, a = 0.5 }
+            };
+            newenemy.commandable.set_command(entity.commandable.command)
+            newenemy.color = { r = 0.5, g = 0, b = 0, a = 0.5 }
+            entity.destroy()
+        end
     end
 end)
+
 
 e.nth_tick(60 * 60, function()
     ---------------------------------------
@@ -377,16 +368,8 @@ e.nth_tick(60 * 60, function()
         precision_index = defines.flow_precision_index.ten_minutes
     }
 
-    --adjust the evolution factor based on the current evolution
-
-    if (evo < 0.3) then
-    elseif (evo < 0.5) then
-        game.map_settings.enemy_evolution.time_factor = 0.00056
-    elseif (evo < 0.7) then
-        game.map_settings.enemy_evolution.time_factor = 0.0008
-    elseif (evo < 0.9) then
-        game.map_settings.enemy_evolution.time_factor = 0.004
-    elseif (evo > 0.95) then
+    local evo = game.forces["enemy"].get_evolution_factor(1)
+    if (evo > 0.95) then
         increase_biter_hp()
     end
 
@@ -397,11 +380,12 @@ e.nth_tick(60 * 60, function()
         end
     end
 
-    if (storage.exhd_game_progress.nauvis_launch)then
+    if (storage.exhd_game_progress.nauvis_launch) then
         return;
     end
     --if hardmode is on increase the size of the settler groups after 10 minutes, otherwise after 30 minutes
-    if ((ticks > 10 * 60 * 60 and storage.hard_mode) or ticks > 30 * 60 * 60) then
+    --Disabled hardmode affecting the biter size
+    if ((ticks > 10 * 60 * 60 and storage.hard_mode and false) or ticks > 30 * 60 * 60) then
         --Start adjusting the pollution consumption modifier after 10 minutes in hardmode and 30 minutes in normal mode
         if pollution > 1 then
             local current_modifier = game.map_settings.pollution.enemy_attack_pollution_consumption_modifier
@@ -420,11 +404,10 @@ e.nth_tick(60 * 60, function()
         game.map_settings.enemy_expansion.settler_group_min_size = 20
         game.map_settings.enemy_expansion.settler_group_max_size = 22
     end
-    
 end)
 e.nth_tick(60, function()
     -- Check if there are any worms or spawners in the spawn area
-    local count = game.surfaces[1].count_entities_filtered { area = { left_top = { x = -32, y = -32 }, right_bottom = { x = 32, y = 32 } }, type = { "et", "unit-spawner" } }
+    local count = game.surfaces[1].count_entities_filtered { area = { left_top = { x = -32, y = -32 }, right_bottom = { x = 32, y = 32 } }, type = { "turret", "unit-spawner" } }
     local was_counting = storage.count_down < storage.count_down_start
     -- If there are any worms or spawners in the spawn area, start counting down, if not reset the countdown
     if (count > 0) then
@@ -432,7 +415,12 @@ e.nth_tick(60, function()
     else
         storage.count_down = storage.count_down_start
     end
-
+    local current_tick = storage.time
+    local evo = current_tick / time_til_100_evo
+    if (evo > 1) then
+        evo = 1
+    end
+    game.forces["enemy"].set_evolution_factor(evo)
     if (was_counting and storage.count_down == storage.count_down_start) then
         -- If we were counting and now we are not, tell the players that the countdown has been reset
         game.print(
@@ -512,7 +500,7 @@ e.on(e.s.on_entity_damaged, function(event)
             --reduce resistance
             local adjusted_damage = damage + (reduced_damage / 2)
             --4x dmg
-            local increased_damage = adjusted_damage * 4
+            local increased_damage = adjusted_damage * 100
 
             --reset health to previous value
             event.entity.health = event.entity.health + event.final_damage_amount
