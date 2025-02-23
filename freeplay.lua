@@ -38,9 +38,9 @@ local resetVariables = function()
 	game.forces["player"].technologies["electronics"].researched = true
 	game.forces["player"].technologies["steam-power"].researched = true
 	game.forces["player"].technologies["automation-science-pack"].researched = true
-	if storage.hard_mode then		
+	if storage.hard_mode then
 		game.forces["player"].manual_mining_speed_modifier = 1
-	else		
+	else
 		game.forces["player"].manual_mining_speed_modifier = 10
 	end
 
@@ -54,11 +54,11 @@ local resetVariables = function()
 	for i = 1, spitter_death_records do
 		storage.u[i] = { 0, 0 }
 	end
-	storage.biter_hp = 3000
-	storage.deconstruction_history = {}
-	storage.no_regen_biters = {}
-	storage.current_pathfinding = nil
-	storage.exhd_game_progress = {
+	storage.biter_hp                                                                  = 3000
+	storage.deconstruction_history                                                    = {}
+	storage.no_regen_biters                                                           = {}
+	storage.current_pathfinding                                                       = nil
+	storage.exhd_game_progress                                                        = {
 		nauvis_launch = false,
 		gleba_touchdown = false,
 		vulcanus_touchdown = false,
@@ -67,19 +67,16 @@ local resetVariables = function()
 		space_edge_reach = false,
 		planets_touched = 0
 	}
-	storage.time = 0
-	storage.motion = nil
+	storage.time                                                                      = 0
+	storage.motion                                                                    = nil
 	-- default starting map settings
-	game.map_settings.enemy_evolution.destroy_factor = 0
-	game.map_settings.enemy_evolution.pollution_factor = 0
+	--We cantrol the evolution of biters with time
+	game.map_settings.enemy_evolution.destroy_factor                                  = 0
+	game.map_settings.enemy_evolution.pollution_factor                                = 0
+	game.map_settings.enemy_evolution.time_factor                                     = 0
 
-	--if storage.hard_mode then
-	--	game.map_settings.enemy_evolution.time_factor = 0.00007
-	--	game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = 0.5
-	--else
-		game.map_settings.enemy_evolution.time_factor = 0.00000
-		game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = 6
-	--end
+	--Make it so pollution doens't actually do much
+	game.map_settings.pollution.enemy_attack_pollution_consumption_modifier           = 100000000000
 	game.map_settings.enemy_expansion.enabled                                         = true
 	game.map_settings.enemy_expansion.max_expansion_cooldown                          = 4000
 	game.map_settings.enemy_expansion.min_expansion_cooldown                          = 3000
@@ -220,10 +217,9 @@ local reset_global_settings__post_surface_clear = function()
 	--game.forces["player"].set_turret_attack_modifier("flamethrower-turret", -0.8)
 	--game.forces["player"].set_turret_attack_modifier("laser-turret", 1.35)
 	--game.forces["player"].set_gun_speed_modifier("laser", 4)
-	
 end
 
-local reset_global_settings = function()	
+local reset_global_settings = function()
 	reset_global_setings__pre_surface_clear()
 	reset_global_settings__post_surface_clear()
 end
@@ -292,6 +288,7 @@ e.on(e.s.on_player_respawned, function(event)
 end)
 ------------------------------------------------------------------------------------------------
 function reset(reason)
+	storage.reset_seed = math.random(1111, 4294967295)
 	if (storage.newgame) then
 		storage.newgame = false
 		game.surfaces[1].clear(true)
@@ -349,25 +346,6 @@ function reset(reason)
 	end
 end
 
--- function place_blueprint()
--- 	if (not (storage.reset_seed == 20133928755)) then
--- 		return
--- 	end
--- 	local surface = game.surfaces[1]
--- 	local position = { x = -27, y = -123 } -- Position where the b`ueprint will be placed
--- 	local force = game.forces["player"]
--- 	local bp_entity = surface.create_entity { name = 'item-on-ground', position = { 0, 0 }, stack = 'blueprint' }
--- 	bp_entity.stack.import_stack(storage.default_blueprint)
--- 	bp_entity.stack.build_blueprint({
--- 		surface = surface,
--- 		force = force,
--- 		position = position,
--- 		build_mode = defines.build_mode.superforced,
--- 		skip_fog_of_war = false
--- 	})
--- 	bp_entity.destroy()
--- end
-
 -----------------------------------------------------------------------------------------------
 e.on(defines.events.on_pre_surface_cleared, function(event)
 	reset_global_setings__pre_surface_clear()
@@ -376,7 +354,11 @@ end)
 e.on(defines.events.on_surface_cleared, function(event)
 	reset_global_settings__post_surface_clear()
 
-	local surface = game.surfaces[1]
+	local surface = game.surfaces[event.surface_index]
+	if event.surface_index ~= 1 then
+		game.delete_surface(surface)
+		return
+	end
 	surface.request_to_generate_chunks({ 0, 0 }, 6)
 	surface.force_generate_chunk_requests()
 	crash_site.create_crash_site(surface, { -5, -6 }, util.copy(storage.crashed_ship_items),
@@ -395,6 +377,9 @@ e.on(defines.events.on_player_toggled_map_editor, function(event)
 end)
 ------------------------------------------------------------------------------------------
 e.on(defines.events.on_console_command, function(event)
+	if (is_debug()) then
+		return
+	end
 	local command = event.command
 	local parameters = event.parameters
 	print(command)
@@ -414,11 +399,12 @@ end)
 e.on(defines.events.on_cargo_pod_finished_ascending, function(event)
 	if storage.exhd_game_progress.nauvis_launch == false then
 		game.print(
-		"The rocket has launched! Well done! The nightmare isn't over yet though, get to the edge of space, engineer.")
+			"The rocket has launched! Well done! The nightmare isn't over yet though, get to the edge of space, engineer.")
 		game.forces["enemy"].kill_all_units()
 		game.surfaces[1].clear_pollution()
-		game.map_settings.pollution.enemy_attack_pollution_consumption_modifier = 0.5
-		storage.exhd_game_progress.nauvis_launch = true
+		game.map_settings.enemy_expansion.max_expansion_cooldown = 4000
+		game.map_settings.enemy_expansion.min_expansion_cooldown = 3000
+		storage.exhd_game_progress.nauvis_launch                 = true
 	end
 end)
 -------------------------------------------------------------------------------------------------------------------------------------------
@@ -450,7 +436,7 @@ e.on(defines.events.on_research_finished, function(event)
 	------------------------------------------------------------------------------------
 	-- if (event.research.name == "physical-projectile-damage-1") then
 	-- 	game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
-	-- end 
+	-- end
 	-- if (event.research.name == "physical-projectile-damage-2") then
 	-- 	game.forces["player"].set_turret_attack_modifier("gun-turret", 0)
 	-- end
@@ -682,18 +668,46 @@ end)
 e.nth_tick(60 * 60, function()
 	-- extend daytime over time	
 	local evo = game.forces["enemy"].get_evolution_factor(1)
-	local tpd = ((evo + 1) * 25000)
-	game.surfaces[1].ticks_per_day = tpd
-	-- reset the game if it has been running for more than 7 days
-	if storage.time > 36288000 then
-		reset("Game has reached its maximum playtime of 7 days.")
-	end
+    local tpd = ((evo + 1) * 25000)
+    game.surfaces[1].ticks_per_day = tpd
+
+    -- Get pollution output from biter and spitter spawners
+    local biter_spawner_pollution = game.get_pollution_statistics(1).get_flow_count {
+        category = "output",
+        name = "biter-spawner",
+        output = true,
+        precision_index = defines.flow_precision_index.one_minute
+    }
+    local spitter_spawner_pollution = game.get_pollution_statistics(1).get_flow_count {
+        category = "output",
+        name = "spitter-spawner",
+        output = true,
+        precision_index = defines.flow_precision_index.one_minute
+    }
+    local pollution = biter_spawner_pollution + spitter_spawner_pollution
+
+    -- Define pollution threshold
+    local pollution_threshold = 40000 -- Pollution at which min_cooldown is applied
+    local min_cooldown = 60    -- Minimum cooldown (highest spawn rate)
+    local max_cooldown = 4000   -- Maximum cooldown (slowest spawn rate)
+
+    local pollution_factor = math.max(0, pollution_threshold - pollution) / pollution_threshold
+    local cooldown = (max_cooldown * pollution_factor) + min_cooldown
+
+    -- Ensure cooldown stays within range
+    cooldown = math.min(max_cooldown, math.max(min_cooldown, cooldown))
+
+    -- Set enemy expansion cooldown dynamically
+    game.map_settings.enemy_expansion.max_expansion_cooldown = cooldown
+    game.map_settings.enemy_expansion.min_expansion_cooldown = cooldown * 0.75
+    -- Debug info in log (optional)
 end)
+
 e.nth_tick(1, function()
-	if(storage.time == nil) then
+	if (storage.time == nil) then
 		storage.time = 0
 	end
-	storage.time =storage.time + 1
+	storage.time = storage.time + 1
 end)
 
 

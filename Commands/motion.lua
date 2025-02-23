@@ -35,14 +35,14 @@ function motioner.show_motion_panel(motioner)
         caption = "Start a change map vote"
     })
 
-    frame.add({
+    --[[ frame.add({
         type = "textfield",
         name = "seed_textfield",
         caption = "Proposed seed",
         tooltip = "Enter the seed you want players to vote for, make blank for random seed",
         text = storage.reset_seed
 
-    })
+    })]]
     frame.add({
         type = "checkbox",
         name = "hardmode_toggle",
@@ -66,12 +66,12 @@ end
 -- Function to show the admin panel with buttons
 function motioner.show_vote_panel(voter)
     -- Clear existing GUI elements if the panel is already open
-    if voter.gui.top.top_panel.vote_panel then
-        voter.gui.top.top_panel.vote_panel.destroy()
+    if voter.gui.center.vote_panel then
+        voter.gui.center.vote_panel.destroy()
     end
 
     -- Create the motion panel
-    local frame = voter.gui.top.top_panel.add({
+    local frame = voter.gui.center.add({
         type = "frame",
         name = "vote_panel",
         direction = "vertical",
@@ -93,74 +93,72 @@ end
 function motioner.on_gui_click(event)
     if (event.element == nil or event.element.valid == false) then return end
     local player = game.players[event.player_index]
-    -- Handle motion panel close button
+
     if event.element.name == "cancel_motion_button" then
         if player.gui.center.motion_panel then
             player.gui.center.motion_panel.destroy()
         end
         return
-    elseif -- Handle the motion
-        event.element.name == "submit_motion_button" then
+    elseif event.element.name == "submit_motion_button" then
+        -- Ensure only the server processes motion creation
+        if game.is_multiplayer() and not game.is_server() then return end
+
         local frame = event.element.parent
-        -- Evaluate whether a motion can be submitted;
+
+        -- Ensure the motion can be submitted
         if storage.time > motion_max_time then
             player.print("You cannot submit a motion after the game is 10 minutes old.")
             frame.destroy()
             return
         end
-        if (storage.motion and storage.motion.started + motion_vote_time > storage.time) then
+        if storage.motion and (storage.motion.started + motion_vote_time > storage.time) then
             local seconds_left = math.ceil(((storage.motion.started + motion_vote_time) - storage.time) / 60)
-            if (storage.motion.started + motion_vote_time > motion_max_time) then
-                player.print("You cannot submit a motion after the game is 10 minutes old.")
-                frame.destroy()
-            else
-                player.print(string.format("A vote is already in progress. A new vote can be started in %s seconds.",
-                    seconds_left))
-            end
+            player.print(string.format("A vote is already in progress. A new vote can be started in %s seconds.",
+                seconds_left))
             return
         end
+
+        -- Initialize motion data
         local children = frame.children
-        local textInput = children[1].text
-        local seed = nil
-        if tonumber(textInput) then
-            seed = tonumber(textInput)
-        end
-        if (seed == nil or not (seed > 0 and seed < 4294967296)) then
-            seed = math.random(1111, 4294967295)
-        end
-        local hardmode = children[2].state
+        local hardmode = children[1].state
+
         storage.motion = {
-            seed = seed,
             hard_mode = hardmode,
-            votes = {}
+            votes = {},
+            started = storage.time -- Ensure this is set
         }
-        if( #game.connected_players < 3) then
-            storage.reset_seed = storage.motion.seed
+
+        -- If fewer than 3 players, auto-pass the motion
+        if #game.connected_players < 2 then
             storage.hard_mode = storage.motion.hard_mode
-            reset(string.format("The motion to change the map has passed."))            
+            reset("The motion to change the map has passed.")
             frame.destroy()
             return
         end
+
         storage.motion.votes[player.name] = true
-        
-        for _, pl in pairs(game.players) do
-            if (pl ~= player) then
+
+        -- Ensure GUI updates are synchronized
+        for _, pl in pairs(game.connected_players) do
+            if pl ~= player then
+                game.get_surface(1).create_entity({ name = "dummy-entity", position = { 0, 0 } }) -- Forces sync
                 motioner.show_vote_panel(pl)
             end
         end
 
         frame.destroy()
-    elseif
-    --handle vote
-        event.element.name == "yes_vote_button" then
+    elseif event.element.name == "yes_vote_button" then
         if player.gui.top.top_panel.vote_panel then
             player.gui.top.top_panel.vote_panel.destroy()
         end
-        if (storage.motion == nil or storage.motion.started + motion_vote_time < storage.time) then
+
+        if storage.motion == nil or storage.motion.started + motion_vote_time < storage.time then
             player.print("The vote has ended.")
             return
         end
+
         storage.motion.votes[player.name] = true
+
         local connected_players_number = #game.connected_players
         local votes_required = math.floor(connected_players_number * majority_required)
 
@@ -172,18 +170,19 @@ function motioner.on_gui_click(event)
         end
 
         if yes_votes_cast > votes_required then
-            storage.reset_seed = storage.motion.seed
             storage.hard_mode = storage.motion.hard_mode
-            reset(string.format("The motion to change the map has passed."))
+            reset("The motion to change the map has passed.")
         end
     elseif event.element.name == "no_vote_button" then
-        if player.gui.top.top_panel.vote_panel then
-            player.gui.top.top_panel.vote_panel.destroy()
+        if player.gui.center.vote_panel then
+            player.gui.center.vote_panel.destroy()
         end
-        if (storage.motion == nil or (storage.motion.started + motion_vote_time < storage.time)) then
+
+        if storage.motion == nil or storage.motion.started + motion_vote_time < storage.time then
             player.print("The vote has ended.")
             return
         end
+
         storage.motion.votes[player.name] = false
     end
 end

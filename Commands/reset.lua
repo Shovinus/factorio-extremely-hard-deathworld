@@ -34,7 +34,7 @@ commands.add_command("reset", "Resets map with random seed. Accepts a valid seed
 		else
 			storage.reset_seed = math.random(1111, 4294967295)
 		end
-
+		storage.reset_seed = math.random(1111, 4294967295)
 		-- Handle the hard_mode
 		if hard_mode_str then
 			if hard_mode_str == "true" then

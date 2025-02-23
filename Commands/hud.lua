@@ -40,15 +40,19 @@ function hud.create_top_left_gui(player)
     local hours = minutes / 60
     local days = hours / 24
     local time_played = string.format("%d days %d:%02d:%02d", days, hours % 24, minutes % 60, seconds % 60)
+    local cooldown = game.map_settings.enemy_expansion.max_expansion_cooldown;
+    local attacks_per_minute = 60 / (cooldown/60);
     -- Update the evolution factor and biter HP labels
     local info_string = string.format([[
     Time: %s
     Evolution: %.2f%%
     Biter HP: %d
+    Attacks Per Minute : %.2f
     ]],
         time_played,
         evolution_factor,
-        biter_hp
+        biter_hp,
+        attacks_per_minute
     )
     player.gui.top.top_panel.top_panel_info.caption = info_string
 end

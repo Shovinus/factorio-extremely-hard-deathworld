@@ -53,9 +53,8 @@ end
 
 
 local function fill_closest_water_tile(start_pos, end_pos, surface)
-    
     local filltile = "landfill"
-    if(storage.time > 60 * 60 * 60) then
+    if (storage.time > 60 * 60 * 60) then
         filltile = "water-shallow"
     end
     local x0, y0 = start_pos.x, start_pos.y
@@ -216,6 +215,10 @@ e.on(e.s.on_script_path_request_finished, function(event)
 end)
 e.on(e.s.on_unit_group_finished_gathering, function(event)
     local group = event.group
+    if (event.group.surface.name ~= "nauvis") then
+        -- Only mess with the nauvis groups
+        return
+    end
     if (group.is_script_driven) then
         --We already set the commands for this group
         return
@@ -292,8 +295,6 @@ end
 function get_quality()
     local qualities_map = { "normal", "uncommon", "rare", "epic", "legendary" }
     if (storage.hard_mode) then
-
-
         -- Get the evolution factor
         local evolution = game.forces["enemy"].get_evolution_factor()
         local evolution_index = evolution * 10                       -- Convert 0-1 range to 0-10 range
